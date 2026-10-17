@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { setRole, useRole } from '@/mocks/store';
 
 const navItems = [
+  { to: '/', label: 'Home', end: true },
   { to: '/hierarchy', label: 'Org chart' },
   { to: '/employees', label: 'Employees' },
   { to: '/audit', label: 'Audit trail' },
@@ -34,6 +35,7 @@ export function AppLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={'end' in item}
               className={({ isActive }) =>
                 cn(
                   'flex items-center border-b-2 px-3 text-sm transition-colors',

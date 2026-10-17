@@ -145,7 +145,12 @@ export const auditFixtures: AuditEntry[] = [
 export const CURRENT_EMPLOYEE_ID = 'e02';
 
 let taskSeq = 0;
-const t = (employeeId: string, title: string, status: TaskStatus, dueDate: string | null): Task => ({
+const t = (
+  employeeId: string,
+  title: string,
+  status: TaskStatus,
+  dueDate: string | null,
+): Task => ({
   id: `t${++taskSeq}`,
   employeeId,
   title,

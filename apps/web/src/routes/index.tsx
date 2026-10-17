@@ -1,8 +1,9 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { Loading } from '@/components/loading';
 import { AppLayout } from './app-layout';
 import { EmployeesRoute } from './employees';
+import { HomeRoute } from './home';
 import { LoginRoute } from './login';
 import { NotFoundRoute } from './not-found';
 
@@ -24,7 +25,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <AppLayout />,
     children: [
-      { index: true, element: <Navigate to="/hierarchy" replace /> },
+      { index: true, element: <HomeRoute /> },
       {
         path: 'hierarchy',
         element: (

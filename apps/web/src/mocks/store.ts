@@ -8,10 +8,8 @@ import type {
   Employee,
   EmployeeInput,
   Role,
-  Task,
-  TaskStatus,
 } from '@/features/employees/types';
-import { auditFixtures, CURRENT_EMPLOYEE_ID, employeeFixtures, taskFixtures } from './fixtures';
+import { auditFixtures, employeeFixtures } from './fixtures';
 
 /**
  * In-memory stand-in for the API, so the screens can be clicked through end to end. It
@@ -22,19 +20,10 @@ import { auditFixtures, CURRENT_EMPLOYEE_ID, employeeFixtures, taskFixtures } fr
 interface State {
   employees: Employee[];
   audit: AuditEntry[];
-  tasks: Task[];
   role: Role;
-  /** The employee record the signed-in user is linked to; drives the home screen. */
-  currentEmployeeId: string;
 }
 
-let state: State = {
-  employees: employeeFixtures,
-  audit: auditFixtures,
-  tasks: taskFixtures,
-  role: 'ADMIN',
-  currentEmployeeId: CURRENT_EMPLOYEE_ID,
-};
+let state: State = { employees: employeeFixtures, audit: auditFixtures, role: 'ADMIN' };
 const listeners = new Set<() => void>();
 let nextAuditId = Math.max(...auditFixtures.map((a) => a.id)) + 1;
 
@@ -72,30 +61,6 @@ export const useEmployees = () =>
 export const useAudit = () => useStore((s) => s.audit);
 export const useRole = () => useStore((s) => s.role);
 export const setRole = (role: Role) => setState({ role });
-
-/** Falls back to the first top-level employee if the signed-in user's record was deleted. */
-export function useCurrentEmployee(): Employee | undefined {
-  const employees = useEmployees();
-  const id = useStore((s) => s.currentEmployeeId);
-  return employees.find((e) => e.id === id) ?? employees.find((e) => e.managerId === null);
-}
-export const setCurrentEmployeeId = (currentEmployeeId: string) =>
-  setState({ currentEmployeeId });
-
-export const useTasks = () => useStore((s) => s.tasks);
-
-export function setTaskStatus(id: string, status: TaskStatus) {
-  setState({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, status } : t)) });
-}
-
-export function addTask(employeeId: string, title: string, dueDate: string | null) {
-  const task: Task = { id: crypto.randomUUID(), employeeId, title, status: 'todo', dueDate };
-  setState({ tasks: [task, ...state.tasks] });
-}
-
-export function removeTask(id: string) {
-  setState({ tasks: state.tasks.filter((t) => t.id !== id) });
-}
 
 function audit(employee: Employee, action: AuditAction, summary: string): AuditEntry {
   return {
