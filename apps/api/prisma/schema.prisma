@@ -1,0 +1,114 @@
+// PostgreSQL via Prisma (ADR-0006). Objects Prisma cannot express — the cycle and audit
+// triggers, the CHECK constraint and the citext extension — live as hand-written SQL in
+// the migration files, which stay the single ordered history.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  VIEWER
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+}
+
+/// The reporting hierarchy as an adjacency list (ADR-0007).
+model Employee {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeNumber String     @unique @map("employee_number")
+  firstName      String     @map("first_name")
+  lastName       String     @map("last_name")
+  /// Required for Gravatar (ADR-0012). citext makes uniqueness case-insensitive.
+  email          String     @unique @db.Citext
+  birthDate      DateTime   @map("birth_date") @db.Date
+  salary         Decimal    @db.Decimal(12, 2)
+  position       String
+  /// NULL marks a root; RESTRICT forces an explicit delete strategy (ADR-0010).
+  managerId      String?    @map("manager_id") @db.Uuid
+  manager        Employee?  @relation("ReportingLine", fields: [managerId], references: [id], onDelete: Restrict)
+  directReports  Employee[] @relation("ReportingLine")
+  /// S3 key of an uploaded avatar; NULL falls back to Gravatar (ADR-0013).
+  avatarKey      String?    @map("avatar_key")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User?
+  tasks Task[]
+
+  @@index([managerId])
+  @@index([lastName, firstName])
+  @@map("employees")
+}
+
+/// Logins are separate from employees (ADR-0014); each may link to one employee (ADR-0022).
+model User {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String         @unique @db.Citext
+  passwordHash  String         @map("password_hash")
+  role          Role
+  employeeId    String?        @unique @map("employee_id") @db.Uuid
+  employee      Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+/// Rotated on every use; a reused token revokes its whole family (ADR-0014).
+model RefreshToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 of the token; the token itself is never stored.
+  tokenHash String    @unique @map("token_hash")
+  familyId  String    @map("family_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+/// Written only by the AFTER trigger on employees (ADR-0011); the API never inserts here.
+model EmployeeAudit {
+  id         BigInt   @id @default(autoincrement())
+  /// No foreign key: the row must outlive a deleted employee.
+  employeeId String   @map("employee_id") @db.Uuid
+  action     String
+  changedBy  String?  @map("changed_by") @db.Uuid
+  changedAt  DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+  before     Json?
+  after      Json?
+
+  @@index([employeeId])
+  @@index([changedAt(sort: Desc)])
+  @@map("employee_audit")
+}
+
+/// Home-screen work items, an additional feature beyond the brief (ADR-0022).
+model Task {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId String     @map("employee_id") @db.Uuid
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title      String
+  status     TaskStatus @default(todo)
+  dueDate    DateTime?  @map("due_date") @db.Date
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([employeeId])
+  @@map("tasks")
+}
