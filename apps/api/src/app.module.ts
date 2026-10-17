@@ -6,7 +6,9 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { SalaryMaskInterceptor } from './common/interceptors/salary-mask.interceptor.js';
 import { ConfigModule } from './config/config.module.js';
+import { EmployeesModule } from './employees/employees.module.js';
 import { HealthController } from './health/health.controller.js';
+import { HierarchyModule } from './hierarchy/hierarchy.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -14,6 +16,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
     ConfigModule,
     PrismaModule,
     AuthModule,
+    EmployeesModule,
+    HierarchyModule,
   ],
   controllers: [HealthController],
   providers: [
