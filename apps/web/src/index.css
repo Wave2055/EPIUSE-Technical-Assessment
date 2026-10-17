@@ -1,52 +1,77 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
-/* shadcn/ui design tokens (new-york, slate). Tailwind v4 reads these through @theme. */
+/*
+ * Palette "B — dark header bar", drawn from the assessment brief: navy #021743 (headings, logo wordmark),
+ * crimson #D41446 (logo mark) and midnight #141723 (banner). Crimson is reserved for brand accents
+ * (active tab, logo) and never used on buttons, so it cannot be mistaken for --destructive.
+ * Token names follow shadcn/ui; Tailwind v4 reads them through @theme.
+ */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --background: #ffffff;
+  --foreground: #1e2a44;
+  --heading: #021743;
+  --card: #ffffff;
+  --card-foreground: #1e2a44;
+  --popover: #ffffff;
+  --popover-foreground: #1e2a44;
+  --primary: #021743;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f6fa;
+  --secondary-foreground: #021743;
+  --muted: #f4f6fa;
+  --muted-foreground: #5b6784;
+  --accent: #eaeef6;
+  --accent-foreground: #021743;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --warning: #a15c07;
+  --border: #dce1ea;
+  --input: #dce1ea;
+  --ring: #3b5ba9;
+  --brand: #d41446;
+  --header: #141723;
+  --header-foreground: #ffffff;
+  --header-muted: #9aa0b4;
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  --background: #141723;
+  --foreground: #d3d8e4;
+  --heading: #f2f4f8;
+  --card: #1c2033;
+  --card-foreground: #f2f4f8;
+  --popover: #1c2033;
+  --popover-foreground: #f2f4f8;
+  --primary: #9fb0d9;
+  --primary-foreground: #021743;
+  --secondary: #1c2033;
+  --secondary-foreground: #f2f4f8;
+  --muted: #1c2033;
+  --muted-foreground: #8d96ae;
+  --accent: #232842;
+  --accent-foreground: #f2f4f8;
+  --destructive: #f07067;
+  --destructive-foreground: #141723;
+  --warning: #f2b35b;
+  --border: #2c3149;
+  --input: #2c3149;
+  --ring: #9fb0d9;
+  --brand: #f0587e;
+  --header: #0d0f18;
+  --header-foreground: #ffffff;
+  --header-muted: #8d96ae;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-heading: var(--heading);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -57,9 +82,14 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-header-muted: var(--header-muted);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -71,5 +101,10 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-heading;
   }
 }

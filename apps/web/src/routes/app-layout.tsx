@@ -11,19 +11,22 @@ const navItems = [
 export function AppLayout() {
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-6 border-b px-6 py-3">
-        <span className="font-semibold tracking-tight">Employee Hierarchy</span>
-        <nav className="flex gap-1">
+      <header className="flex items-center gap-6 bg-header px-6 text-header-foreground">
+        <span className="flex items-center gap-2 py-3 font-semibold tracking-tight">
+          <span aria-hidden className="size-2.5 rounded-full bg-brand" />
+          Employee Hierarchy
+        </span>
+        <nav className="flex gap-1 self-stretch">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
                 cn(
-                  'rounded-md px-3 py-1.5 text-sm transition-colors',
+                  'flex items-center border-b-2 px-3 text-sm transition-colors',
                   isActive
-                    ? 'bg-secondary text-secondary-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'border-brand font-medium text-header-foreground'
+                    : 'border-transparent text-header-muted hover:text-header-foreground',
                 )
               }
             >

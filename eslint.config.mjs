@@ -77,6 +77,15 @@ export default tseslint.config(
     },
   },
 
+  /* shadcn/ui primitives are vendored as generated, and export their cva variants and form
+     hooks next to the components by convention. Kept as-is so the CLI can update them. */
+  {
+    files: ['apps/web/src/components/ui/**/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+
   /* Tests may lean on non-null assertions and loose typing. */
   {
     files: ['**/*.{test,spec}.{ts,tsx}', '**/e2e/**/*.ts'],
