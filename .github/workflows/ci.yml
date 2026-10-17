@@ -1,0 +1,101 @@
+# Continuous integration (ADR-0019): every push and pull request runs lint, typecheck,
+# unit tests, integration tests against a real PostgreSQL (ADR-0020) and both builds.
+#
+# Deployment on merge to main (ECR + SSM for the API, S3 + CloudFront for the SPA) is a
+# separate workflow, added once the Terraform infrastructure exists.
+#
+# Third-party actions are pinned to full commit SHAs, with the release tag alongside, so a
+# moved or compromised tag cannot change what runs here.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only token: CI never writes to the repository. Deploy jobs will request OIDC
+# (id-token: write) for themselves.
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR supersedes the run in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+
+jobs:
+  checks:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Also runs `prisma generate` through the API's postinstall.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The apps import @epiuse/shared from its build output, so it must exist before any
+      # typecheck, lint or test of its dependents (ADR-0003).
+      - name: Build shared package
+        run: pnpm --filter @epiuse/shared build
+
+      - name: Scan for secrets
+        run: pnpm scan:secrets
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test:unit
+
+      - name: Build
+        run: pnpm build
+
+  integration:
+    name: Integration tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @epiuse/shared build
+
+      # GitHub's Ubuntu runners include Docker, which Testcontainers uses to start a
+      # throwaway PostgreSQL per suite. Migrations are applied exactly as in production,
+      # so a broken migration fails here rather than on deploy (ADR-0020).
+      - name: Pull PostgreSQL image
+        run: docker pull postgres:17-alpine
+
+      - name: Integration tests
+        run: pnpm test:integration
