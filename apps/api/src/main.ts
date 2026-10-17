@@ -1,8 +1,18 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
+import { AppConfig } from './config/app-config.js';
+import { loadSecretsIntoEnv } from './config/load-secrets.js';
+import { configureApp } from './configure-app.js';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+try {
+  process.loadEnvFile('.env');
+} catch {
+  // No .env file: the environment (or Secrets Manager) provides configuration.
 }
-await bootstrap();
+await loadSecretsIntoEnv();
+
+const app = await NestFactory.create(AppModule);
+configureApp(app);
+app.enableShutdownHooks();
+await app.listen(app.get(AppConfig).env.PORT);
