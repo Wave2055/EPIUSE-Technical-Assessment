@@ -1,4 +1,12 @@
 {
   "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+  /* Mirrors the alias in tsconfig.app.json. The shadcn CLI only reads this root file, and
+     without it writes components to a literal `@/` folder. */
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
 }

@@ -1,5 +1,18 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { ChevronDown, LogOut } from 'lucide-react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type { Role } from '@/features/employees/types';
 import { cn } from '@/lib/utils';
+import { setRole, useRole } from '@/mocks/store';
 
 const navItems = [
   { to: '/hierarchy', label: 'Org chart' },
@@ -34,10 +47,39 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+        <UserMenu />
       </header>
       <main className="min-h-0 flex-1">
         <Outlet />
       </main>
     </div>
+  );
+}
+
+/** Signed-in user. The role switch is a design aid for previewing salary masking (ADR-0014). */
+function UserMenu() {
+  const role = useRole();
+  const navigate = useNavigate();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="ml-auto flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-header-muted hover:text-header-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+        <span className="grid size-7 place-items-center rounded-full bg-header-foreground/10 text-xs font-semibold text-header-foreground">
+          AD
+        </span>
+        <span className="hidden sm:inline">admin@example.com</span>
+        <ChevronDown className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Preview as</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={role} onValueChange={(v) => setRole(v as Role)}>
+          <DropdownMenuRadioItem value="ADMIN">Admin (full access)</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="VIEWER">Viewer (read-only)</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => navigate('/login')}>
+          <LogOut /> Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
