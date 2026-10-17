@@ -35,6 +35,8 @@ Each record captures one decision with its context, consequences and the alterna
 | [0019](0019-github-actions-oidc-cicd.md)                   | Deploy from GitHub Actions using OIDC role assumption                     | Accepted |
 | [0020](0020-test-database-triggers-with-testcontainers.md) | Test against real PostgreSQL via Testcontainers                           | Accepted |
 | [0021](0021-credit-funded-run-rate-and-teardown.md)        | Accept a credit-funded run rate and commit to teardown                    | Accepted |
+| **Additional features**                                    |                                                                           |          |
+| [0022](0022-home-screen-tasks-and-user-employee-link.md)   | Add a personal home screen with tasks, linking logins to employees        | Accepted |
 
 ## Start here
 
