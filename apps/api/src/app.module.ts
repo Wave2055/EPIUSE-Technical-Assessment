@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
@@ -9,6 +10,7 @@ import { ConfigModule } from './config/config.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
 import { HealthController } from './health/health.controller.js';
 import { HierarchyModule } from './hierarchy/hierarchy.module.js';
+import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -18,6 +20,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
     AuthModule,
     EmployeesModule,
     HierarchyModule,
+    AuditModule,
+    MeModule,
   ],
   controllers: [HealthController],
   providers: [
