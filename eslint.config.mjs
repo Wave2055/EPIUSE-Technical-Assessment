@@ -18,6 +18,7 @@ export default tseslint.config(
       '**/playwright-report/**',
       '**/test-results/**',
       '**/*.generated.ts',
+      'apps/api/src/generated/**',
       'infra/**',
     ],
   },
@@ -38,11 +39,17 @@ export default tseslint.config(
   },
 
   /* API — Node environment. NestJS needs decorator metadata, so its decorators read as
-     unused expressions to the base rules. */
+     unused expressions to the base rules. Telling the parser about decorator metadata stops
+     consistent-type-imports from turning injected classes into type-only imports, which
+     erases them at runtime and breaks dependency injection. */
   {
     files: ['apps/api/**/*.ts'],
     languageOptions: {
       globals: globals.node,
+      parserOptions: {
+        emitDecoratorMetadata: true,
+        experimentalDecorators: true,
+      },
     },
     rules: {
       '@typescript-eslint/no-extraneous-class': 'off',
