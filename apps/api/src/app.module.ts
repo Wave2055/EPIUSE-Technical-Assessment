@@ -12,6 +12,7 @@ import { HealthController } from './health/health.controller.js';
 import { HierarchyModule } from './hierarchy/hierarchy.module.js';
 import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { TasksModule } from './tasks/tasks.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     HierarchyModule,
     AuditModule,
     MeModule,
+    TasksModule,
   ],
   controllers: [HealthController],
   providers: [
