@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+docs/**/*.pdf
+apps/api/prisma/migrations/
+infra/**/.terraform/
+playwright-report/
+test-results/

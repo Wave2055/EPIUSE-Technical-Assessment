@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+#
+# Secret scanning pre-commit hook.
+#
+# Wired up by `core.hooksPath = .githooks`, which the root `prepare` script sets so a fresh
+# clone is protected after `pnpm install`. It lives in the repository rather than in
+# .git/hooks so that it is versioned and reviewable.
+#
+# ADR-0014 and ADR-0018 both rest on secrets never entering git: the JWT signing key and
+# the RDS password are generated straight into Secrets Manager and read by the container at
+# boot. ADR-0019 removes long-lived AWS keys from CI for the same reason. This hook is where
+# those decisions are enforced rather than merely intended.
+#
+# Bypass in a genuine emergency with `git commit --no-verify`, understanding that you are
+# switching off the last thing between a live credential and the remote.
+
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+fail() {
+  echo "" >&2
+  echo "✖ pre-commit: $1" >&2
+  echo "  Nothing has been committed. Remove the secret, or re-run with --no-verify if you" >&2
+  echo "  are certain this is a false positive." >&2
+  exit 1
+}
+
+# Added, copied or modified. Deletions and pure renames carry no new content to scan.
+mapfile -t -d '' STAGED < <(git diff --cached --name-only --diff-filter=ACM -z)
+[ ${#STAGED[@]} -eq 0 ] && exit 0
+
+# ---------------------------------------------------------------------------
+# 1. Paths that must never be committed, whatever they contain.
+#    .gitignore already covers most of these, but `git add -f` walks straight past it.
+# ---------------------------------------------------------------------------
+FORBIDDEN=(
+  '(^|/)\.env$'
+  '(^|/)\.env\.(local|development|production|test)$'
+  '\.tfstate(\.|$)'
+  '\.tfvars$'
+  '\.(pem|p12|pfx|jks|keystore|asc)$'
+  '(^|/)id_(rsa|dsa|ecdsa|ed25519)$'
+  '(^|/)\.(npmrc|pypirc|netrc)$'
+  '(^|/)credentials$'
+  '(^|/)\.aws/'
+  '\.kubeconfig$'
+)
+
+BLOCKED=()
+for file in "${STAGED[@]}"; do
+  [[ $file == *.example ]] && continue
+  for pattern in "${FORBIDDEN[@]}"; do
+    if [[ $file =~ $pattern ]]; then
+      BLOCKED+=("$file")
+      break
+    fi
+  done
+done
+
+if [ ${#BLOCKED[@]} -gt 0 ]; then
+  echo "These paths are never committed to this repository:" >&2
+  printf '  %s\n' "${BLOCKED[@]}" >&2
+  fail "${#BLOCKED[@]} forbidden path(s) staged"
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Choose what to scan.
+#
+#    .secretlintignore is not consulted here: its globs resolve relative to the file's own
+#    directory, which cannot match the temporary tree built below. The exclusions are
+#    therefore applied to the staged list directly, where they are explicit and testable.
+#    .secretlintignore still governs the repository-wide `pnpm scan:secrets` run.
+# ---------------------------------------------------------------------------
+SKIP=(
+  '\.example$'                                   # placeholders, by convention
+  '(^|/)pnpm-lock\.yaml$'
+  '(^|/)\.secretlintrc\.json$'                   # quotes the patterns it searches for
+  '\.(png|jpe?g|gif|ico|webp|svg|pdf|woff2?|ttf|eot|zip|gz|tgz|mp4|wasm)$'
+  '(^|/)(node_modules|dist|coverage)/'
+)
+
+TO_SCAN=()
+for file in "${STAGED[@]}"; do
+  skip=0
+  for pattern in "${SKIP[@]}"; do
+    [[ $file =~ $pattern ]] && { skip=1; break; }
+  done
+  [ $skip -eq 1 ] && continue
+  # Skip anything large enough to be a build artefact; secrets live in text files.
+  size=$(git cat-file -s ":$file" 2>/dev/null || echo 0)
+  [ "$size" -gt 1048576 ] && continue
+  TO_SCAN+=("$file")
+done
+
+[ ${#TO_SCAN[@]} -eq 0 ] && exit 0
+
+# ---------------------------------------------------------------------------
+# 3. Scan the staged *content*.
+#
+#    The index, not the working tree: `git add -p` can stage a secret that the working-tree
+#    copy no longer shows, and scanning the working tree would wave it through. Staged blobs
+#    are materialised at their real paths so filename-sensitive rules still apply, and the
+#    scanner runs once over the lot.
+# ---------------------------------------------------------------------------
+SECRETLINT="$REPO_ROOT/node_modules/.bin/secretlint"
+if [ ! -x "$SECRETLINT" ]; then
+  fail "secretlint is not installed — run \`pnpm install\` (this commit could not be verified)"
+fi
+
+SCAN_DIR=$(mktemp -d)
+trap 'rm -rf "$SCAN_DIR"' EXIT
+
+for file in "${TO_SCAN[@]}"; do
+  mkdir -p "$SCAN_DIR/$(dirname "$file")"
+  git show ":$file" > "$SCAN_DIR/$file"
+done
+
+# --no-gitignore: the temp tree carries no .gitignore, and the staged set is already the
+# authoritative list of what is about to be committed. The temp prefix is stripped from the
+# report so the paths shown are the ones in the repository.
+if ! "$SECRETLINT" \
+  --secretlintrc "$REPO_ROOT/.secretlintrc.json" \
+  --no-gitignore \
+  --format stylish \
+  --no-terminalLink \
+  "$SCAN_DIR/**/*" 2>&1 | sed "s|$SCAN_DIR/||g"; then
+  fail "secret scan found credentials in staged content"
+fi
+
+exit 0

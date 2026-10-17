@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment and secrets — never committed (ADR-0018)
+.env
+.env.*
+!.env.example
+
+# Terraform state contains resource attributes and is confidential (ADR-0018)
+infra/**/.terraform/
+infra/**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+
+# Test and coverage output
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.npmrc
