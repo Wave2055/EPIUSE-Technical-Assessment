@@ -1,6 +1,6 @@
 # ADR-0008: Prevent reporting cycles at both the service and database layers
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0023](0023-record-implementation-deviations.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0007](0007-adjacency-list-for-the-hierarchy.md), [ADR-0011](0011-audit-trail-via-database-triggers.md), [ADR-0020](0020-test-database-triggers-with-testcontainers.md)

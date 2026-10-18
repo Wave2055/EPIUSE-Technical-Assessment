@@ -1,6 +1,6 @@
 # ADR-0005: React + Vite SPA for the web client
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0023](0023-record-implementation-deviations.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0002](0002-separate-api-and-web-deployables.md), [ADR-0016](0016-single-cloudfront-distribution-dual-origin.md)

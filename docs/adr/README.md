@@ -13,23 +13,23 @@ Each record captures one decision with its context, consequences and the alterna
 | **Application architecture**                               |                                                                           |          |
 | [0002](0002-separate-api-and-web-deployables.md)           | Deploy the API and web client as separate processes                       | Accepted |
 | [0003](0003-typescript-monorepo-with-shared-schemas.md)    | TypeScript monorepo with a shared validation package                      | Accepted |
-| [0004](0004-nestjs-for-the-api.md)                         | NestJS as the API framework                                               | Accepted |
-| [0005](0005-react-vite-spa-for-the-web-client.md)          | React + Vite SPA for the web client                                       | Accepted |
+| [0004](0004-nestjs-for-the-api.md)                         | NestJS as the API framework                                               | Amended  |
+| [0005](0005-react-vite-spa-for-the-web-client.md)          | React + Vite SPA for the web client                                       | Amended  |
 | **Data and domain**                                        |                                                                           |          |
 | [0006](0006-postgresql-via-prisma.md)                      | PostgreSQL via Prisma as the system of record                             | Accepted |
 | [0007](0007-adjacency-list-for-the-hierarchy.md)           | Model the reporting hierarchy as an adjacency list                        | Accepted |
-| [0008](0008-defence-in-depth-cycle-prevention.md)          | **Prevent reporting cycles at both the service and database layers**      | Accepted |
+| [0008](0008-defence-in-depth-cycle-prevention.md)          | **Prevent reporting cycles at both the service and database layers**      | Amended  |
 | [0009](0009-permit-multiple-hierarchy-roots.md)            | Permit multiple hierarchy roots, surfaced as a warning                    | Accepted |
 | [0010](0010-explicit-deletion-strategies.md)               | Require an explicit strategy when deleting a manager                      | Accepted |
-| [0011](0011-audit-trail-via-database-triggers.md)          | Record the audit trail with database triggers and a session variable      | Accepted |
+| [0011](0011-audit-trail-via-database-triggers.md)          | Record the audit trail with database triggers and a session variable      | Amended  |
 | **Employee profile and access**                            |                                                                           |          |
 | [0012](0012-require-email-on-employee-record.md)           | **Add a required email field to the employee record**                     | Accepted |
-| [0013](0013-avatar-resolution-chain.md)                    | Resolve avatars server-side through a fallback chain                      | Accepted |
-| [0014](0014-self-hosted-jwt-auth-and-salary-masking.md)    | Self-hosted JWT authentication with role-based salary masking             | Accepted |
+| [0013](0013-avatar-resolution-chain.md)                    | Resolve avatars server-side through a fallback chain                      | Amended  |
+| [0014](0014-self-hosted-jwt-auth-and-salary-masking.md)    | Self-hosted JWT authentication with role-based salary masking             | Amended  |
 | **Infrastructure**                                         |                                                                           |          |
 | [0015](0015-ec2-docker-for-api-compute.md)                 | Run the API container on an EC2 t3.micro                                  | Accepted |
 | [0016](0016-single-cloudfront-distribution-dual-origin.md) | Serve the SPA and the API from one CloudFront distribution                | Accepted |
-| [0017](0017-omit-nat-gateway-use-ssm.md)                   | Omit the NAT gateway; place EC2 in a public subnet and administer via SSM | Accepted |
+| [0017](0017-omit-nat-gateway-use-ssm.md)                   | Omit the NAT gateway; place EC2 in a public subnet and administer via SSM | Amended  |
 | [0018](0018-terraform-for-infrastructure.md)               | Define all infrastructure in Terraform                                    | Accepted |
 | **Delivery**                                               |                                                                           |          |
 | [0019](0019-github-actions-oidc-cicd.md)                   | Deploy from GitHub Actions using OIDC role assumption                     | Accepted |
@@ -37,6 +37,8 @@ Each record captures one decision with its context, consequences and the alterna
 | [0021](0021-credit-funded-run-rate-and-teardown.md)        | Accept a credit-funded run rate and commit to teardown                    | Accepted |
 | **Additional features**                                    |                                                                           |          |
 | [0022](0022-home-screen-tasks-and-user-employee-link.md)   | Add a personal home screen with tasks, linking logins to employees        | Accepted |
+| **Implementation**                                         |                                                                           |          |
+| [0023](0023-record-implementation-deviations.md)           | Record where the implementation departs from earlier records              | Accepted |
 
 ## Start here
 
@@ -59,7 +61,8 @@ Three records carry most of the engineering judgement in this solution:
 | Avatar upload _(optional nice-to-have)_                         | [0013](0013-avatar-resolution-chain.md)                                                                                                              |
 | Cloud deployment at a provided URL                              | [0015](0015-ec2-docker-for-api-compute.md), [0016](0016-single-cloudfront-distribution-dual-origin.md), [0017](0017-omit-nat-gateway-use-ssm.md)     |
 | No mocked data; remote database                                 | [0006](0006-postgresql-via-prisma.md), [0021](0021-credit-funded-run-rate-and-teardown.md)                                                           |
-| Technical document                                              | this stack, summarised in `../technical-document.md`                                                                                                 |
+| Technical document                                              | this stack, summarised in [`../technical-document.md`](../technical-document.md)                                                                     |
+| User guide                                                      | [`../user-guide.md`](../user-guide.md)                                                                                                               |
 
 ## Design patterns
 

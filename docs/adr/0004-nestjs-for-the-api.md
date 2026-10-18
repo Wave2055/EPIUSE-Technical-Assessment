@@ -1,6 +1,6 @@
 # ADR-0004: NestJS as the API framework
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0023](0023-record-implementation-deviations.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0003](0003-typescript-monorepo-with-shared-schemas.md), [ADR-0006](0006-postgresql-via-prisma.md), [ADR-0014](0014-self-hosted-jwt-auth-and-salary-masking.md)

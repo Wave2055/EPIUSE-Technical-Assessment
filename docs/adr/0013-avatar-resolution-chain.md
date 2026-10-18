@@ -1,6 +1,6 @@
 # ADR-0013: Resolve avatars server-side through a fallback chain
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0023](0023-record-implementation-deviations.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0012](0012-require-email-on-employee-record.md), [ADR-0016](0016-single-cloudfront-distribution-dual-origin.md)
