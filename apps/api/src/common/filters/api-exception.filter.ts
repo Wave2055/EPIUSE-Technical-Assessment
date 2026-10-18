@@ -85,13 +85,26 @@ function hasSqlState(error: unknown, code: string, depth = 0): boolean {
   return Object.values(record).some((v) => hasSqlState(v, code, depth + 1));
 }
 
+/**
+ * The violated columns. The pg driver adapter reports only the unique index, e.g.
+ * `employees_employee_number_key`, so the column is recovered from Postgres's default
+ * `<table>_<column>_key` naming when no field list is given.
+ */
 function uniqueFields(error: Prisma.PrismaClientKnownRequestError): string[] {
   const meta = error.meta as
     | {
         target?: string[] | string;
-        driverAdapterError?: { cause?: { constraint?: { fields?: string[] } } };
+        driverAdapterError?: {
+          cause?: { table?: string; constraint?: { fields?: string[]; index?: string } };
+        };
       }
     | undefined;
-  const target = meta?.target ?? meta?.driverAdapterError?.cause?.constraint?.fields ?? [];
-  return (Array.isArray(target) ? target : [target]).map((f) => f.replace(/"/g, ''));
+  const cause = meta?.driverAdapterError?.cause;
+  const target = meta?.target ?? cause?.constraint?.fields;
+  if (target) return (Array.isArray(target) ? target : [target]).map((f) => f.replace(/"/g, ''));
+
+  const index = cause?.constraint?.index;
+  if (!index) return [];
+  const prefix = cause?.table ? `${cause.table}_` : '';
+  return [index.replace(prefix, '').replace(/_key$/, '')];
 }

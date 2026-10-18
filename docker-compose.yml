@@ -1,0 +1,20 @@
+# Local PostgreSQL for development: `docker compose up -d`.
+# Production uses RDS (ADR-0006); integration tests start their own container (ADR-0020).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: epiuse
+      POSTGRES_PASSWORD: epiuse
+      POSTGRES_DB: epiuse
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U epiuse']
+      interval: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

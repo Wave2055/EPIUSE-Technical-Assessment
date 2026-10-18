@@ -5,8 +5,7 @@ import { defineConfig } from 'vitest/config';
  * queries, against a real PostgreSQL instance rather than a mock.
  *
  * Kept separate from the unit config because container startup is seconds, not
- * milliseconds, so only unit tests run on watch. No suites exist yet — the database layer
- * is not written.
+ * milliseconds, so only unit tests run on watch. Needs a running Docker daemon.
  */
 export default defineConfig({
   resolve: { tsconfigPaths: true },
