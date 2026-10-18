@@ -1,23 +1,17 @@
 import {
-  columnFilteringFeature,
   createColumnHelper,
-  createFilteredRowModel,
-  createSortedRowModel,
-  filterFn_equalsString,
-  filterFn_includesString,
-  globalFilteringFeature,
   rowSortingFeature,
-  sortFn_alphanumeric,
-  sortFn_basic,
-  sortFn_text,
   tableFeatures,
   useTable,
   type Column,
+  type SortingState,
 } from '@tanstack/react-table';
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -26,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -51,73 +47,84 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useIsAdmin } from '@/features/auth/use-session';
+import { useEmployeeList, useHierarchy } from '@/features/employees/api';
 import { DeleteEmployeeDialog } from '@/features/employees/delete-employee-dialog';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { EmployeeFormSheet } from '@/features/employees/employee-form-sheet';
 import { formatDate, formatSalary, fullName } from '@/features/employees/format';
 import type { Employee } from '@/features/employees/types';
+import { errorMessage } from '@/lib/api-errors';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { cn } from '@/lib/utils';
-import { useEmployees, useRole } from '@/mocks/store';
 
+// Sorting, searching, filtering and paging all happen in the API, so the table only needs
+// the sorting feature for its header state.
 const features = tableFeatures({
   rowSortingFeature,
-  columnFilteringFeature,
-  globalFilteringFeature,
-  sortedRowModel: createSortedRowModel(),
-  filteredRowModel: createFilteredRowModel(),
-  sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text, basic: sortFn_basic },
-  filterFns: { includesString: filterFn_includesString, equalsString: filterFn_equalsString },
   columnMeta: {} as { align?: 'left' | 'right' },
 });
 
-type Row = Employee & { name: string; managerName: string };
+const col = createColumnHelper<typeof features, Employee>();
 
 const ALL = 'all';
-const col = createColumnHelper<typeof features, Row>();
+const NO_MANAGER = 'none';
+const PAGE_SIZE = 25;
 
 /**
  * The reporting table: the brief's second required surface, sortable and filterable on any
  * employee field.
  *
- * TanStack Table supplies per-column sort and filter (ADR-0005). Sorting and filtering on
- * salary is refused for a VIEWER, because permitting it would leak the ordering of a field
- * the API has masked (ADR-0014).
+ * The API owns search, sort, filter and paging (ADR-0005). Column ids match the API's sort
+ * allowlist. Salary sorting is switched off for a VIEWER, because the API refuses it: the
+ * order alone would leak a value it masks (ADR-0014).
  */
 export function EmployeesRoute() {
-  const employees = useEmployees();
-  const role = useRole();
-  const isAdmin = role === 'ADMIN';
+  const isAdmin = useIsAdmin();
   const [editing, setEditing] = useState<Employee | null | undefined>(undefined);
   const [deleting, setDeleting] = useState<Employee | null>(null);
 
-  const data = useMemo<Row[]>(() => {
-    const byId = new Map(employees.map((e) => [e.id, e]));
-    return employees.map((e) => {
-      const manager = e.managerId ? byId.get(e.managerId) : undefined;
-      return { ...e, name: fullName(e), managerName: manager ? fullName(manager) : '' };
-    });
-  }, [employees]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }]);
+  const [search, setSearch] = useState('');
+  const [position, setPosition] = useState(ALL);
+  const [managerId, setManagerId] = useState(ALL);
+  const [page, setPage] = useState(1);
+  const q = useDebouncedValue(search.trim());
 
+  const sort = sorting[0] ? `${sorting[0].id}:${sorting[0].desc ? 'desc' : 'asc'}` : 'name:asc';
+  const list = useEmployeeList({
+    q: q || undefined,
+    sort,
+    position: position === ALL ? undefined : position,
+    managerId: managerId === ALL ? undefined : managerId,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+
+  // Filter choices come from the whole organisation, not just the current page.
+  const nodes = useHierarchy().data?.nodes;
   const positions = useMemo(
-    () => [...new Set(employees.map((e) => e.position))].sort(),
-    [employees],
+    () => [...new Set((nodes ?? []).map((n) => n.position))].sort(),
+    [nodes],
   );
-  const managers = useMemo(
-    () => [...new Set(data.map((r) => r.managerName).filter(Boolean))].sort(),
-    [data],
-  );
+  const managers = useMemo(() => {
+    const ids = new Set((nodes ?? []).map((n) => n.managerId).filter(Boolean));
+    return (nodes ?? [])
+      .filter((n) => ids.has(n.id))
+      .sort((a, b) => fullName(a).localeCompare(fullName(b)));
+  }, [nodes]);
 
   const columns = useMemo(
     () =>
       col.columns([
-        col.accessor('name', {
+        col.accessor((e) => fullName(e), {
+          id: 'name',
           header: 'Name',
-          sortFn: 'text',
           cell: ({ row }) => (
             <div className="flex items-center gap-3">
               <EmployeeAvatar employee={row.original} />
               <div className="grid">
-                <span className="font-medium text-heading">{row.original.name}</span>
+                <span className="font-medium text-heading">{fullName(row.original)}</span>
                 <span className="text-xs text-muted-foreground">{row.original.email}</span>
               </div>
             </div>
@@ -125,14 +132,12 @@ export function EmployeesRoute() {
         }),
         col.accessor('employeeNumber', {
           header: 'Number',
-          sortFn: 'alphanumeric',
           cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
         }),
-        col.accessor('position', { header: 'Role', sortFn: 'text', filterFn: 'equalsString' }),
-        col.accessor('managerName', {
+        col.accessor('position', { header: 'Role' }),
+        col.accessor((e) => (e.manager ? fullName(e.manager) : ''), {
+          id: 'manager',
           header: 'Manager',
-          sortFn: 'text',
-          filterFn: 'equalsString',
           cell: (info) =>
             info.getValue() || (
               <Badge variant="outline" className="border-warning/40 text-warning">
@@ -142,14 +147,11 @@ export function EmployeesRoute() {
         }),
         col.accessor('birthDate', {
           header: 'Birth date',
-          sortFn: 'alphanumeric',
           cell: (info) => formatDate(info.getValue()),
         }),
         col.accessor('salary', {
           header: 'Salary',
-          sortFn: 'basic',
           enableSorting: isAdmin,
-          enableGlobalFilter: false,
           meta: { align: 'right' },
           cell: (info) => (
             <span
@@ -169,7 +171,7 @@ export function EmployeesRoute() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Actions for ${row.original.name}`}
+                    aria-label={`Actions for ${fullName(row.original)}`}
                   >
                     <MoreHorizontal />
                   </Button>
@@ -193,19 +195,31 @@ export function EmployeesRoute() {
     [isAdmin],
   );
 
+  const items = list.data?.items ?? [];
   const table = useTable({
     features,
     columns,
-    data,
-    globalFilterFn: 'includesString',
-    initialState: { sorting: [{ id: 'name', desc: false }] },
+    data: items,
+    manualSorting: true,
+    enableSortingRemoval: false,
+    state: { sorting },
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      setPage(1);
+    },
   });
 
-  const globalFilter = (table.state.globalFilter as string | undefined) ?? '';
-  const positionFilter = (table.getColumn('position')?.getFilterValue() as string) ?? ALL;
-  const managerFilter = (table.getColumn('managerName')?.getFilterValue() as string) ?? ALL;
-  const filtered = globalFilter !== '' || positionFilter !== ALL || managerFilter !== ALL;
+  const total = list.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const filtered = search !== '' || position !== ALL || managerId !== ALL;
   const rows = table.getRowModel().rows;
+
+  function resetTo<T>(set: (value: T) => void) {
+    return (value: T) => {
+      set(value);
+      setPage(1);
+    };
+  }
 
   return (
     <section className="mx-auto flex h-full max-w-7xl flex-col gap-4 p-6">
@@ -213,9 +227,7 @@ export function EmployeesRoute() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Employees</h1>
           <p className="text-sm text-muted-foreground">
-            {rows.length === data.length
-              ? `${data.length} employees`
-              : `${rows.length} of ${data.length} employees`}
+            {list.data ? `${total} ${filtered ? 'matching ' : ''}employees` : 'Loading…'}
           </p>
         </div>
         {isAdmin && (
@@ -229,19 +241,14 @@ export function EmployeesRoute() {
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={globalFilter}
-            onChange={(e) => table.setGlobalFilter(e.target.value)}
+            value={search}
+            onChange={(e) => resetTo(setSearch)(e.target.value)}
             placeholder="Search name, number, email or role"
             className="pl-8"
             aria-label="Search employees"
           />
         </div>
-        <Select
-          value={positionFilter}
-          onValueChange={(v) =>
-            table.getColumn('position')?.setFilterValue(v === ALL ? undefined : v)
-          }
-        >
+        <Select value={position} onValueChange={resetTo(setPosition)}>
           <SelectTrigger className="w-48" aria-label="Filter by role">
             <SelectValue />
           </SelectTrigger>
@@ -254,20 +261,16 @@ export function EmployeesRoute() {
             ))}
           </SelectContent>
         </Select>
-        <Select
-          value={managerFilter}
-          onValueChange={(v) =>
-            table.getColumn('managerName')?.setFilterValue(v === ALL ? undefined : v)
-          }
-        >
+        <Select value={managerId} onValueChange={resetTo(setManagerId)}>
           <SelectTrigger className="w-48" aria-label="Filter by manager">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>All managers</SelectItem>
+            <SelectItem value={NO_MANAGER}>No manager</SelectItem>
             {managers.map((m) => (
-              <SelectItem key={m} value={m}>
-                {m}
+              <SelectItem key={m.id} value={m.id}>
+                {fullName(m)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -276,8 +279,10 @@ export function EmployeesRoute() {
           <Button
             variant="ghost"
             onClick={() => {
-              table.setGlobalFilter('');
-              table.resetColumnFilters();
+              setSearch('');
+              setPosition(ALL);
+              setManagerId(ALL);
+              setPage(1);
             }}
           >
             <X /> Clear
@@ -285,7 +290,18 @@ export function EmployeesRoute() {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
+      {list.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(list.error)}</AlertDescription>
+        </Alert>
+      )}
+
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-auto rounded-lg border transition-opacity',
+          list.isPlaceholderData && 'opacity-60',
+        )}
+      >
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-secondary">
             {table.getHeaderGroups().map((group) => (
@@ -308,6 +324,14 @@ export function EmployeesRoute() {
             ))}
           </TableHeader>
           <TableBody>
+            {list.isPending &&
+              Array.from({ length: 6 }, (_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={columns.length}>
+                    <Skeleton className="h-8 w-full" />
+                  </TableCell>
+                </TableRow>
+              ))}
             {rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getAllCells().map((cell) => (
@@ -320,7 +344,7 @@ export function EmployeesRoute() {
                 ))}
               </TableRow>
             ))}
-            {rows.length === 0 && (
+            {list.isSuccess && rows.length === 0 && (
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
@@ -333,6 +357,32 @@ export function EmployeesRoute() {
           </TableBody>
         </Table>
       </div>
+
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-end gap-3 text-sm text-muted-foreground">
+          <span className="tabular-nums">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </span>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Previous page"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Next page"
+            disabled={page >= pageCount}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+      )}
 
       {editing !== undefined && (
         <EmployeeFormSheet
@@ -356,7 +406,7 @@ function SortButton({
   column,
   children,
 }: {
-  column: Column<typeof features, Row>;
+  column: Column<typeof features, Employee>;
   children: React.ReactNode;
 }) {
   const sorted = column.getIsSorted();
