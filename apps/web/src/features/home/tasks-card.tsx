@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ export function TasksCard({
   view,
   onViewChange,
   onToggle,
+  onAdd,
 }: {
   self: Employee;
   reports: Employee[];
@@ -28,6 +30,7 @@ export function TasksCard({
   view: TaskView;
   onViewChange: (view: TaskView) => void;
   onToggle?: (task: Task, done: boolean) => void;
+  onAdd?: (title: string) => Promise<void>;
 }) {
   const tasksFor = (id: string) => tasks.filter((t) => t.employeeId === id);
   const openCount = (id: string) => tasksFor(id).filter((t) => t.status !== 'done').length;
@@ -57,7 +60,7 @@ export function TasksCard({
 
         <CardContent>
           <TabsContent value="mine" className="grid gap-3">
-            <AddTaskRow />
+            {onAdd && <AddTaskRow onAdd={onAdd} />}
             <TaskList
               tasks={tasksFor(self.id)}
               onToggle={onToggle}
@@ -106,12 +109,33 @@ function PersonSection({
   );
 }
 
-/** Design-only: the input and button are laid out but not wired to a store yet. */
-function AddTaskRow() {
+function AddTaskRow({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
+  const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await onAdd(title.trim());
+      setTitle('');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-      <Input placeholder="Add a task, e.g. Review Q4 budget" aria-label="New task" />
-      <Button type="submit" variant="secondary">
+    <form className="flex gap-2" onSubmit={(e) => void submit(e)}>
+      <Input
+        id="new-task"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Add a task, e.g. Review Q4 budget"
+        aria-label="New task"
+        maxLength={200}
+      />
+      <Button type="submit" variant="secondary" disabled={saving || !title.trim()}>
         <Plus /> Add
       </Button>
     </form>
