@@ -3,6 +3,7 @@ import { CalendarIcon } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { CreateEmployeeSchema } from '@epiuse/shared';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -32,27 +33,41 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { MockRuleError, saveEmployee, useEmployees } from '@/mocks/store';
+import { ApiRequestError } from '@/lib/api-client';
+import { errorMessage, fieldIssues } from '@/lib/api-errors';
+import { useHierarchy, useSaveEmployee } from './api';
 import { formatDate, fullName, parseIsoDate, toIsoDate } from './format';
 import { getEligibleManagers } from './hierarchy';
 import type { Employee } from './types';
 
 const NO_MANAGER = 'none';
+const fields = CreateEmployeeSchema.shape;
 
-/** Local schema until the shared one lands in `@epiuse/shared` (ADR-0003). */
+/**
+ * The shared create schema (ADR-0003), adapted to form inputs: salary is typed as text, a
+ * date can be unpicked, and "no manager" is a sentinel the Select can hold.
+ */
 const employeeSchema = z.object({
-  firstName: z.string().trim().min(1, 'Enter a first name.'),
-  lastName: z.string().trim().min(1, 'Enter a surname.'),
-  employeeNumber: z
+  firstName: fields.firstName,
+  lastName: fields.lastName,
+  employeeNumber: fields.employeeNumber,
+  email: fields.email,
+  birthDate: z.string().min(1, 'Choose a birth date.').pipe(fields.birthDate),
+  position: fields.position,
+  salary: z
     .string()
     .trim()
-    .regex(/^E-\d{4}$/, 'Use the format E-0000.'),
-  email: z.email('Enter a valid email address.'),
-  birthDate: z.string().min(1, 'Choose a birth date.'),
-  position: z.string().trim().min(1, 'Enter a role or position.'),
-  salary: z.coerce.number<string>().nonnegative('Salary cannot be negative.'),
+    .min(1, 'Enter a salary.')
+    .pipe(z.coerce.number('Enter the salary as a number.'))
+    .pipe(fields.salary),
   managerId: z.string(),
 });
+
+/** The API names a clashing field by label (see the API's exception filter). */
+const CONFLICT_FIELDS: Record<string, 'employeeNumber' | 'email'> = {
+  'employee number': 'employeeNumber',
+  'email address': 'email',
+};
 
 type FormValues = z.input<typeof employeeSchema>;
 
@@ -93,7 +108,8 @@ export function EmployeeFormSheet({
   employee: Employee | null;
   defaultManagerId?: string;
 }) {
-  const employees = useEmployees();
+  const { data: chart } = useHierarchy();
+  const save = useSaveEmployee();
   const form = useForm<FormValues, unknown, z.output<typeof employeeSchema>>({
     resolver: zodResolver(employeeSchema),
     defaultValues: toFormValues(employee, defaultManagerId),
@@ -105,27 +121,45 @@ export function EmployeeFormSheet({
 
   const managers = useMemo(
     () =>
-      getEligibleManagers(employees, employee?.id).sort((a, b) =>
+      getEligibleManagers(chart?.nodes ?? [], employee?.id).sort((a, b) =>
         fullName(a).localeCompare(fullName(b)),
       ),
-    [employees, employee?.id],
+    [chart, employee?.id],
   );
 
-  function onSubmit(values: z.output<typeof employeeSchema>) {
+  async function onSubmit(values: z.output<typeof employeeSchema>) {
     try {
-      const saved = saveEmployee(
-        { ...values, managerId: values.managerId === NO_MANAGER ? null : values.managerId },
-        employee?.id,
-      );
+      const saved = await save.mutateAsync({
+        id: employee?.id,
+        input: { ...values, managerId: values.managerId === NO_MANAGER ? null : values.managerId },
+      });
       toast.success(employee ? `Saved ${fullName(saved)}` : `Added ${fullName(saved)}`);
       onOpenChange(false);
     } catch (error) {
-      if (error instanceof MockRuleError) {
-        form.setError('root', { message: error.message });
+      showServerError(error);
+    }
+  }
+
+  /** Puts each server-side problem next to the field it belongs to, where possible. */
+  function showServerError(error: unknown) {
+    const issues = Object.entries(fieldIssues(error));
+    if (issues.length > 0) {
+      for (const [path, message] of issues) {
+        if (path in employeeSchema.shape) {
+          form.setError(path as keyof FormValues, { message });
+        }
+      }
+      return;
+    }
+    if (error instanceof ApiRequestError && error.code === 'CONFLICT') {
+      const labels = (error.details as { fields?: string[] } | undefined)?.fields ?? [];
+      const field = labels.map((l) => CONFLICT_FIELDS[l]).find(Boolean);
+      if (field) {
+        form.setError(field, { message: error.message });
         return;
       }
-      throw error;
     }
+    form.setError('root', { message: errorMessage(error) });
   }
 
   return (
@@ -308,7 +342,9 @@ export function EmployeeFormSheet({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{employee ? 'Save changes' : 'Add employee'}</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {employee ? 'Save changes' : 'Add employee'}
+              </Button>
             </SheetFooter>
           </form>
         </Form>

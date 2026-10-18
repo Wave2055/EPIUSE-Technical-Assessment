@@ -1,6 +1,8 @@
-import { Lock } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -16,10 +18,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useAudit } from '@/features/audit/api';
+import { useIsAdmin } from '@/features/auth/use-session';
 import { formatDateTime } from '@/features/employees/format';
 import type { AuditAction } from '@/features/employees/types';
+import { errorMessage } from '@/lib/api-errors';
 import { cn } from '@/lib/utils';
-import { useAudit, useRole } from '@/mocks/store';
+
+const PAGE_SIZE = 50;
 
 const ACTION_STYLES: Record<AuditAction, string> = {
   CREATE: 'border-transparent bg-primary text-primary-foreground',
@@ -40,15 +46,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
  * by construction (ADR-0011).
  */
 export function AuditRoute() {
-  const entries = useAudit();
-  const role = useRole();
-  const [action, setAction] = useState<AuditAction | 'all'>('all');
-  const rows = useMemo(
-    () => (action === 'all' ? entries : entries.filter((e) => e.action === action)),
-    [entries, action],
-  );
-
-  if (role !== 'ADMIN') {
+  if (!useIsAdmin()) {
     return (
       <section className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <Lock className="size-6 text-muted-foreground" />
@@ -59,6 +57,19 @@ export function AuditRoute() {
       </section>
     );
   }
+  return <AuditTrail />;
+}
+
+function AuditTrail() {
+  const [action, setAction] = useState<AuditAction | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const audit = useAudit({
+    action: action === 'all' ? undefined : action,
+    page,
+    pageSize: PAGE_SIZE,
+  });
+  const rows = audit.data?.items ?? [];
+  const total = audit.data?.total ?? 0;
 
   return (
     <section className="mx-auto flex h-full max-w-7xl flex-col gap-4 p-6">
@@ -69,7 +80,13 @@ export function AuditRoute() {
             Every change to an employee record, newest first. Entries cannot be edited.
           </p>
         </div>
-        <Select value={action} onValueChange={(v) => setAction(v as AuditAction | 'all')}>
+        <Select
+          value={action}
+          onValueChange={(v) => {
+            setAction(v as AuditAction | 'all');
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-48" aria-label="Filter by change type">
             <SelectValue />
           </SelectTrigger>
@@ -84,7 +101,18 @@ export function AuditRoute() {
         </Select>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
+      {audit.isError && (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(audit.error)}</AlertDescription>
+        </Alert>
+      )}
+
+      <div
+        className={cn(
+          'min-h-0 flex-1 overflow-auto rounded-lg border transition-opacity',
+          audit.isPlaceholderData && 'opacity-60',
+        )}
+      >
         <Table>
           <TableHeader className="sticky top-0 bg-secondary">
             <TableRow className="hover:bg-transparent">
@@ -109,13 +137,46 @@ export function AuditRoute() {
                 <TableCell className="font-medium text-heading">{entry.employeeName}</TableCell>
                 <TableCell className="whitespace-normal">{entry.summary}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {entry.changedBy ?? <span className="italic">System</span>}
+                  {entry.changedBy?.email ?? <span className="italic">System</span>}
                 </TableCell>
               </TableRow>
             ))}
+            {audit.isSuccess && rows.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  No changes recorded yet.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
+
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-end gap-3 text-sm text-muted-foreground">
+          <span className="tabular-nums">
+            {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+          </span>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Newer changes"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Older changes"
+            disabled={page * PAGE_SIZE >= total}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+      )}
     </section>
   );
 }

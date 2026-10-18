@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { deleteEmployee, MockRuleError, useEmployees } from '@/mocks/store';
+import { errorMessage } from '@/lib/api-errors';
+import { useDeleteEmployee, useHierarchy } from './api';
 import { fullName } from './format';
 import { getDirectReports, getEligibleManagers } from './hierarchy';
 import type { DeleteStrategy, Employee } from './types';
@@ -32,33 +33,37 @@ import type { DeleteStrategy, Employee } from './types';
 export function DeleteEmployeeDialog({
   employee,
   onOpenChange,
+  onDeleted,
 }: {
-  employee: Employee;
+  employee: Pick<Employee, 'id' | 'firstName' | 'lastName' | 'managerId'>;
   onOpenChange: (open: boolean) => void;
+  onDeleted?: () => void;
 }) {
-  const employees = useEmployees();
-  const reports = useMemo(() => getDirectReports(employees, employee.id), [employees, employee]);
+  const chart = useHierarchy().data;
+  const nodes = useMemo(() => chart?.nodes ?? [], [chart]);
+  const remove = useDeleteEmployee();
+  const reports = getDirectReports(nodes, employee.id);
   const isRoot = employee.managerId === null;
-  const manager = employees.find((e) => e.id === employee.managerId);
-  const candidates = useMemo(
-    () => getEligibleManagers(employees, employee.id),
-    [employees, employee],
-  );
+  const manager = nodes.find((e) => e.id === employee.managerId);
+  const candidates = useMemo(() => getEligibleManagers(nodes, employee.id), [nodes, employee]);
 
   const [strategy, setStrategy] = useState<DeleteStrategy>(isRoot ? 'reassign' : 'promote');
   const [reassignTo, setReassignTo] = useState<string>('');
 
   const needsTarget = reports.length > 0 && strategy === 'reassign' && !reassignTo;
-  const target = strategy === 'promote' ? manager : employees.find((e) => e.id === reassignTo);
+  const target = strategy === 'promote' ? manager : nodes.find((e) => e.id === reassignTo);
 
-  function confirm() {
+  async function confirm() {
     try {
-      deleteEmployee(employee.id, strategy, reassignTo || undefined);
+      await remove.mutateAsync({
+        id: employee.id,
+        query: strategy === 'reassign' ? { strategy, reassignTo } : { strategy },
+      });
       toast.success(`Deleted ${fullName(employee)}`);
+      onDeleted?.();
       onOpenChange(false);
     } catch (error) {
-      if (error instanceof MockRuleError) toast.error(error.message);
-      else throw error;
+      toast.error(errorMessage(error));
     }
   }
 
@@ -137,7 +142,11 @@ export function DeleteEmployeeDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button variant="destructive" disabled={needsTarget} onClick={confirm}>
+          <Button
+            variant="destructive"
+            disabled={needsTarget || remove.isPending}
+            onClick={() => void confirm()}
+          >
             Delete employee
           </Button>
         </AlertDialogFooter>
