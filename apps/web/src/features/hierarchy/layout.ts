@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { stratify, tree } from 'd3-hierarchy';
-import type { Employee } from '@/features/employees/types';
+import type { HierarchyNode } from '@/features/employees/types';
 
 export const NODE_WIDTH = 220;
 export const NODE_HEIGHT = 64;
@@ -8,13 +8,16 @@ const H_GAP = 24;
 const V_GAP = 56;
 const FOREST_ROOT = '__forest__';
 
-export type EmployeeNode = Node<{ employee: Employee; reportCount: number }, 'employee'>;
+export type EmployeeNode = Node<{ employee: HierarchyNode; reportCount: number }, 'employee'>;
 
 /**
  * Lays out the org chart with d3's tidy tree. Multiple roots are allowed (ADR-0009), so every
  * root hangs off one invisible parent and the result renders as a forest.
  */
-export function layoutHierarchy(employees: Employee[]): { nodes: EmployeeNode[]; edges: Edge[] } {
+export function layoutHierarchy(employees: HierarchyNode[]): {
+  nodes: EmployeeNode[];
+  edges: Edge[];
+} {
   if (employees.length === 0) return { nodes: [], edges: [] };
 
   const reportCount = new Map<string, number>();
@@ -22,7 +25,7 @@ export function layoutHierarchy(employees: Employee[]): { nodes: EmployeeNode[];
     if (e.managerId) reportCount.set(e.managerId, (reportCount.get(e.managerId) ?? 0) + 1);
   }
 
-  type Item = { id: string; parentId: string | null; employee?: Employee };
+  type Item = { id: string; parentId: string | null; employee?: HierarchyNode };
   const items: Item[] = [
     { id: FOREST_ROOT, parentId: null },
     ...employees.map((e) => ({ id: e.id, parentId: e.managerId ?? FOREST_ROOT, employee: e })),

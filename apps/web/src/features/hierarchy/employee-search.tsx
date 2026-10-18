@@ -11,15 +11,15 @@ import {
 } from '@/components/ui/command';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { fullName } from '@/features/employees/format';
-import type { Employee } from '@/features/employees/types';
+import type { HierarchyNode } from '@/features/employees/types';
 
 /** Find-a-person for the org chart. Ctrl/⌘ K opens it from anywhere on the page. */
 export function EmployeeSearch({
   employees,
   onSelect,
 }: {
-  employees: Employee[];
-  onSelect: (employee: Employee) => void;
+  employees: HierarchyNode[];
+  onSelect: (employee: HierarchyNode) => void;
 }) {
   const [open, setOpen] = useState(false);
 

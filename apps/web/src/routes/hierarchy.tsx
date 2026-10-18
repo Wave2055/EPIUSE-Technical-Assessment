@@ -10,19 +10,23 @@ import {
 } from '@xyflow/react';
 import { Pencil, Trash2, TriangleAlert, UserPlus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Loading } from '@/components/loading';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useIsAdmin } from '@/features/auth/use-session';
+import { useEmployee, useHierarchy } from '@/features/employees/api';
 import { DeleteEmployeeDialog } from '@/features/employees/delete-employee-dialog';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { EmployeeFormSheet } from '@/features/employees/employee-form-sheet';
 import { formatDate, formatSalary, fullName } from '@/features/employees/format';
 import { getDirectReports, getRoots } from '@/features/employees/hierarchy';
-import type { Employee } from '@/features/employees/types';
+import type { Employee, HierarchyNode } from '@/features/employees/types';
 import { EmployeeNodeCard } from '@/features/hierarchy/employee-node';
 import { EmployeeSearch } from '@/features/hierarchy/employee-search';
 import { layoutHierarchy, NODE_HEIGHT, NODE_WIDTH } from '@/features/hierarchy/layout';
-import { useEmployees, useRole } from '@/mocks/store';
+import { errorMessage } from '@/lib/api-errors';
 
 const nodeTypes: NodeTypes = { employee: EmployeeNodeCard };
 
@@ -42,20 +46,20 @@ export function HierarchyRoute() {
 }
 
 function OrgChart() {
-  const employees = useEmployees();
-  const isAdmin = useRole() === 'ADMIN';
+  const chart = useHierarchy();
+  const isAdmin = useIsAdmin();
   const { setCenter } = useReactFlow();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ employee: Employee | null; managerId?: string }>();
   const [deleting, setDeleting] = useState<Employee | null>(null);
 
-  const { nodes, edges } = useMemo(() => layoutHierarchy(employees), [employees]);
-  const selected = employees.find((e) => e.id === selectedId) ?? null;
-  const roots = getRoots(employees);
+  const people = useMemo(() => chart.data?.nodes ?? [], [chart.data]);
+  const { nodes, edges } = useMemo(() => layoutHierarchy(people), [people]);
+  const roots = getRoots(people);
 
-  function focus(employee: Employee) {
-    setSelectedId(employee.id);
-    const node = nodes.find((n) => n.id === employee.id);
+  function focus(person: HierarchyNode) {
+    setSelectedId(person.id);
+    const node = nodes.find((n) => n.id === person.id);
     if (node) {
       void setCenter(node.position.x + NODE_WIDTH / 2, node.position.y + NODE_HEIGHT / 2, {
         zoom: 1.1,
@@ -64,17 +68,28 @@ function OrgChart() {
     }
   }
 
+  if (chart.isPending) return <Loading />;
+  if (chart.isError) {
+    return (
+      <div className="p-6">
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(chart.error)}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <section className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Org chart</h1>
           <p className="text-sm text-muted-foreground">
-            {employees.length} employees · click a person to see their details
+            {people.length} employees · click a person to see their details
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <EmployeeSearch employees={employees} onSelect={focus} />
+          <EmployeeSearch employees={people} onSelect={focus} />
           {isAdmin && (
             <Button onClick={() => setEditing({ employee: null })}>
               <UserPlus /> Add employee
@@ -110,40 +125,46 @@ function OrgChart() {
 
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
-          <ReactFlow
-            nodes={nodes.map((n) => ({ ...n, selected: n.id === selectedId }))}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodeClick={(_, node) => setSelectedId(node.id)}
-            onPaneClick={() => setSelectedId(null)}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
-            minZoom={0.2}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background gap={24} color="var(--border)" />
-            <Controls showInteractive={false} />
-            <MiniMap
-              pannable
-              zoomable
-              nodeColor="var(--primary)"
-              maskColor="rgb(20 23 35 / 0.08)"
-            />
-          </ReactFlow>
+          {people.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              No employees yet.{isAdmin && ' Add the first one to start the chart.'}
+            </div>
+          ) : (
+            <ReactFlow
+              nodes={nodes.map((n) => ({ ...n, selected: n.id === selectedId }))}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodeClick={(_, node) => setSelectedId(node.id)}
+              onPaneClick={() => setSelectedId(null)}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.2}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background gap={24} color="var(--border)" />
+              <Controls showInteractive={false} />
+              <MiniMap
+                pannable
+                zoomable
+                nodeColor="var(--primary)"
+                maskColor="rgb(20 23 35 / 0.08)"
+              />
+            </ReactFlow>
+          )}
         </div>
 
-        {selected && (
+        {selectedId && (
           <DetailsPanel
-            employee={selected}
-            employees={employees}
+            id={selectedId}
+            people={people}
             isAdmin={isAdmin}
             onClose={() => setSelectedId(null)}
             onFocus={focus}
-            onEdit={() => setEditing({ employee: selected })}
-            onAddReport={() => setEditing({ employee: null, managerId: selected.id })}
-            onDelete={() => setDeleting(selected)}
+            onEdit={(employee) => setEditing({ employee })}
+            onAddReport={(employee) => setEditing({ employee: null, managerId: employee.id })}
+            onDelete={setDeleting}
           />
         )}
       </div>
@@ -160,20 +181,18 @@ function OrgChart() {
         <DeleteEmployeeDialog
           key={deleting.id}
           employee={deleting}
-          onOpenChange={(open) => {
-            if (open) return;
-            if (!employees.some((e) => e.id === deleting.id)) setSelectedId(null);
-            setDeleting(null);
-          }}
+          onDeleted={() => setSelectedId(null)}
+          onOpenChange={(open) => !open && setDeleting(null)}
         />
       )}
     </section>
   );
 }
 
+/** The selected person's full record, fetched on demand; the chart only carries the basics. */
 function DetailsPanel({
-  employee,
-  employees,
+  id,
+  people,
   isAdmin,
   onClose,
   onFocus,
@@ -181,45 +200,49 @@ function DetailsPanel({
   onAddReport,
   onDelete,
 }: {
-  employee: Employee;
-  employees: Employee[];
+  id: string;
+  people: HierarchyNode[];
   isAdmin: boolean;
   onClose: () => void;
-  onFocus: (e: Employee) => void;
-  onEdit: () => void;
-  onAddReport: () => void;
-  onDelete: () => void;
+  onFocus: (person: HierarchyNode) => void;
+  onEdit: (employee: Employee) => void;
+  onAddReport: (employee: Employee) => void;
+  onDelete: (employee: Employee) => void;
 }) {
-  const manager = employees.find((e) => e.id === employee.managerId);
-  const reports = getDirectReports(employees, employee.id);
+  const { data: employee, isError, error } = useEmployee(id);
+  const node = people.find((p) => p.id === id);
+  const manager = people.find((p) => p.id === node?.managerId);
+  const reports = getDirectReports(people, id);
+
+  if (!node) return null;
 
   return (
     <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l bg-card">
       <div className="flex items-start gap-3 p-4">
-        <EmployeeAvatar employee={employee} className="size-14 text-base" />
+        <EmployeeAvatar employee={node} className="size-14 text-base" />
         <div className="grid min-w-0 flex-1">
-          <h2 className="truncate text-base font-semibold">{fullName(employee)}</h2>
-          <p className="text-sm text-muted-foreground">{employee.position}</p>
+          <h2 className="truncate text-base font-semibold">{fullName(node)}</h2>
+          <p className="text-sm text-muted-foreground">{node.position}</p>
         </div>
         <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close details">
           <X />
         </Button>
       </div>
 
-      {isAdmin && (
+      {isAdmin && employee && (
         <div className="flex gap-2 px-4 pb-4">
-          <Button size="sm" variant="outline" onClick={onEdit}>
+          <Button size="sm" variant="outline" onClick={() => onEdit(employee)}>
             <Pencil /> Edit
           </Button>
-          <Button size="sm" variant="outline" onClick={onAddReport}>
+          <Button size="sm" variant="outline" onClick={() => onAddReport(employee)}>
             <UserPlus /> Add report
           </Button>
           <Button
             size="sm"
             variant="ghost"
             className="ml-auto text-destructive hover:text-destructive"
-            onClick={onDelete}
-            aria-label={`Delete ${fullName(employee)}`}
+            onClick={() => onDelete(employee)}
+            aria-label={`Delete ${fullName(node)}`}
           >
             <Trash2 />
           </Button>
@@ -227,30 +250,36 @@ function DetailsPanel({
       )}
 
       <Separator />
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 p-4 text-sm">
-        <dt className="text-muted-foreground">Number</dt>
-        <dd className="font-mono">{employee.employeeNumber}</dd>
-        <dt className="text-muted-foreground">Email</dt>
-        <dd className="truncate">{employee.email}</dd>
-        <dt className="text-muted-foreground">Born</dt>
-        <dd>{formatDate(employee.birthDate)}</dd>
-        <dt className="text-muted-foreground">Salary</dt>
-        <dd className="tabular-nums">{formatSalary(employee.salary)}</dd>
-        <dt className="text-muted-foreground">Manager</dt>
-        <dd>
-          {manager ? (
-            <button
-              type="button"
-              className="text-heading underline-offset-2 hover:underline"
-              onClick={() => onFocus(manager)}
-            >
-              {fullName(manager)}
-            </button>
-          ) : (
-            <span className="text-warning">None</span>
-          )}
-        </dd>
-      </dl>
+      {isError ? (
+        <p className="p-4 text-sm text-destructive">{errorMessage(error)}</p>
+      ) : (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 p-4 text-sm">
+          <dt className="text-muted-foreground">Number</dt>
+          <dd className="font-mono">{node.employeeNumber}</dd>
+          <dt className="text-muted-foreground">Email</dt>
+          <dd className="truncate">{employee ? employee.email : <Skeleton className="h-4" />}</dd>
+          <dt className="text-muted-foreground">Born</dt>
+          <dd>{employee ? formatDate(employee.birthDate) : <Skeleton className="h-4" />}</dd>
+          <dt className="text-muted-foreground">Salary</dt>
+          <dd className="tabular-nums">
+            {employee ? formatSalary(employee.salary) : <Skeleton className="h-4" />}
+          </dd>
+          <dt className="text-muted-foreground">Manager</dt>
+          <dd>
+            {manager ? (
+              <button
+                type="button"
+                className="text-heading underline-offset-2 hover:underline"
+                onClick={() => onFocus(manager)}
+              >
+                {fullName(manager)}
+              </button>
+            ) : (
+              <span className="text-warning">None</span>
+            )}
+          </dd>
+        </dl>
+      )}
 
       <Separator />
       <div className="p-4">
@@ -259,7 +288,7 @@ function DetailsPanel({
           <span className="font-normal text-muted-foreground">({reports.length})</span>
         </h3>
         {reports.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No one reports to {employee.firstName}.</p>
+          <p className="text-sm text-muted-foreground">No one reports to {node.firstName}.</p>
         ) : (
           <ul className="grid gap-1">
             {reports.map((r) => (
