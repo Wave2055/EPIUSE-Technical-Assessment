@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { Loading } from '@/components/loading';
+import { RequireSession } from '@/features/auth/require-session';
 import { AppLayout } from './app-layout';
 import { EmployeesRoute } from './employees';
 import { HomeRoute } from './home';
@@ -23,7 +24,11 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginRoute /> },
   {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <RequireSession>
+        <AppLayout />
+      </RequireSession>
+    ),
     children: [
       { index: true, element: <HomeRoute /> },
       {

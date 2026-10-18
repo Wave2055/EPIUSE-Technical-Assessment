@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { LoginSchema, type LoginInput } from '@epiuse/shared';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
-import { z } from 'zod';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import type { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,24 +21,34 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-
-const loginSchema = z.object({
-  email: z.email('Enter the email address you sign in with.'),
-  password: z.string().min(1, 'Enter your password.'),
-});
+import { useSession } from '@/features/auth/use-session';
+import { errorMessage } from '@/lib/api-errors';
 
 /**
  * Login. Posts to the API, which returns a short-lived access token held in memory and sets
  * the refresh token as an httpOnly cookie (ADR-0014).
  *
- * Until the auth endpoints exist, any well-formed credentials go straight through.
+ * After signing in, the user returns to the page they were sent here from.
  */
 export function LoginRoute() {
+  const { state, login } = useSession();
   const navigate = useNavigate();
-  const form = useForm({
-    resolver: zodResolver(loginSchema),
+  const from = (useLocation().state as { from?: string } | null)?.from ?? '/';
+  const form = useForm<z.input<typeof LoginSchema>, unknown, LoginInput>({
+    resolver: zodResolver(LoginSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  if (state.status === 'signedIn') return <Navigate to={from} replace />;
+
+  async function onSubmit(values: LoginInput) {
+    try {
+      await login(values);
+      navigate(from, { replace: true });
+    } catch (error) {
+      form.setError('root', { message: errorMessage(error) });
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -53,7 +64,7 @@ export function LoginRoute() {
             <CardDescription>Use the account your administrator set up for you.</CardDescription>
           </CardHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(() => navigate('/hierarchy'))} noValidate>
+            <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
               <CardContent className="grid gap-4">
                 <FormField
                   control={form.control}
@@ -82,9 +93,14 @@ export function LoginRoute() {
                   )}
                 />
               </CardContent>
+              {form.formState.errors.root && (
+                <p role="alert" className="mt-4 px-6 text-sm text-destructive">
+                  {form.formState.errors.root.message}
+                </p>
+              )}
               <CardFooter className="mt-6">
-                <Button type="submit" className="w-full">
-                  Sign in
+                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
                 </Button>
               </CardFooter>
             </form>
