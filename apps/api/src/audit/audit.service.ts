@@ -60,6 +60,7 @@ export class AuditService {
       }),
     ]);
     const managerNames = new Map(managers.map((m) => [m.id, `${m.firstName} ${m.lastName}`]));
+    await this.addFormerEmployeeNames(managerNames, managerIds);
     const userById = new Map(users.map((u) => [u.id, u]));
 
     return {
@@ -81,5 +82,27 @@ export class AuditService {
       page: query.page,
       pageSize: query.pageSize,
     };
+  }
+
+  /**
+   * A manager who has since been deleted is no longer in `employees`, but the trail still
+   * holds their last snapshot. Deleting a manager re-parents their reports first, so this is
+   * the common case for REPARENT rows, not an edge case.
+   */
+  private async addFormerEmployeeNames(names: Map<string, string>, ids: Set<string>) {
+    const missing = [...ids].filter((id) => !names.has(id));
+    if (missing.length === 0) return;
+    const rows = await this.prisma.employeeAudit.findMany({
+      where: { employeeId: { in: missing } },
+      orderBy: { id: 'desc' },
+      select: { employeeId: true, before: true, after: true },
+    });
+    for (const row of rows) {
+      if (names.has(row.employeeId)) continue;
+      const name =
+        snapshotName(row.after as AuditSnapshot | null) ??
+        snapshotName(row.before as AuditSnapshot | null);
+      if (name) names.set(row.employeeId, name);
+    }
   }
 }
