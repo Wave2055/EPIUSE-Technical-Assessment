@@ -33,3 +33,6 @@ playwright-report/
 .vscode/*
 !.vscode/extensions.json
 .npmrc
+
+# Generated Prisma client (rebuilt by `prisma generate` on install)
+apps/api/src/generated/

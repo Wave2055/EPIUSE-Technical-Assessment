@@ -1,6 +1,6 @@
 # ADR-0017: Omit the NAT gateway; place EC2 in a public subnet and administer via SSM
 
-- **Status:** Accepted
+- **Status:** Accepted; private subnet tier made unnecessary by [ADR-0023](0023-postgresql-container-on-the-api-instance.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0015](0015-ec2-docker-for-api-compute.md), [ADR-0016](0016-single-cloudfront-distribution-dual-origin.md), [ADR-0021](0021-credit-funded-run-rate-and-teardown.md)

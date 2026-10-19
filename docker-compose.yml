@@ -1,0 +1,24 @@
+# Local PostgreSQL for development: copy .env.example to .env, set a password, then
+# `docker compose up -d`. Production uses RDS (ADR-0006); integration tests start their
+# own container (ADR-0020).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: epiuse
+      # From the gitignored root .env, so no password is committed (ADR-0018).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: epiuse
+    ports:
+      # Loopback only. Docker's published ports bypass the host firewall, so a bare
+      # '5432:5432' would expose the database to every network this machine joins.
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U epiuse']
+      interval: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

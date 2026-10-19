@@ -1,0 +1,83 @@
+# Production runtime on the EC2 instance: PostgreSQL (ADR-0023) and the API behind Caddy
+# (ADR-0015).
+#
+# The instance keeps a root-only `.env` here, never committed, written by user-data and
+# each deploy (via SSM Run Command, ADR-0019) from Secrets Manager and Terraform outputs:
+#
+#   API_IMAGE=<ecr-repo>:<sha>
+#   POSTGRES_PASSWORD=<from the secret; the same one inside its DATABASE_URL>
+#   SECRETS_ARN=...  AVATAR_BUCKET=...  BACKUP_BUCKET=...
+#
+# then runs, from this directory:
+#
+#   docker compose pull && docker compose up -d --wait
+#
+# `--wait` returns only once every service is healthy, so a deploy whose migrations or
+# startup fail is reported as failed. The API reads its own configuration from Secrets
+# Manager, including a DATABASE_URL for user epiuse on host `postgres`, port 5432.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: epiuse
+      POSTGRES_DB: epiuse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      # A subdirectory, because the root of a freshly formatted volume holds lost+found
+      # and initdb refuses a non-empty directory.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    # Sized for a 1 GB instance shared with the API. The API's pool stays well under this.
+    command: ['postgres', '-c', 'max_connections=40', '-c', 'shared_buffers=128MB']
+    volumes:
+      # The dedicated EBS volume, mounted by user-data. It outlives the instance, so
+      # replacing the instance does not lose the database (ADR-0023).
+      - ${POSTGRES_DATA_DIR:-/srv/epiuse/postgres}:/var/lib/postgresql/data:z
+    # Not published: only the API reaches it, over this compose network.
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U epiuse -d epiuse']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: &logging
+      driver: json-file
+      options:
+        # The instance has an 8 GB root volume (ADR-0021); unbounded logs would fill it.
+        max-size: 10m
+        max-file: '3'
+
+  api:
+    image: ${API_IMAGE:?Set API_IMAGE to the image to run}
+    restart: unless-stopped
+    # tini as PID 1 forwards SIGTERM to the API and reaps the migration subprocess.
+    init: true
+    environment:
+      SECRETS_ARN: ${SECRETS_ARN:-}
+      AWS_REGION: ${AWS_REGION:-eu-west-1}
+      AVATAR_BUCKET: ${AVATAR_BUCKET:-}
+      ASSET_BASE_URL: ${ASSET_BASE_URL:-}
+    expose:
+      - '3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    volumes:
+      # `z` relabels the file for SELinux hosts; it is a no-op elsewhere.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+    depends_on:
+      api:
+        condition: service_healthy
+    # Through the proxy to the API, so `--wait` covers the whole request path.
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/api/health']
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging: *logging
