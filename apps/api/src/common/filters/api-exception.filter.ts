@@ -20,6 +20,7 @@ const STATUS_CODES: Partial<Record<number, ErrorCode>> = {
   403: 'FORBIDDEN',
   404: 'NOT_FOUND',
   409: 'CONFLICT',
+  429: 'RATE_LIMITED',
 };
 
 const FIELD_LABELS: Record<string, string> = {

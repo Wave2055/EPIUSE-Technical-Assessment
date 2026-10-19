@@ -16,6 +16,7 @@ export const ERROR_CODES = [
   'ROOT_DELETE_NEEDS_REASSIGN',
   'NOT_LINKED',
   'AVATAR_UPLOADS_DISABLED',
+  'RATE_LIMITED',
   'INTERNAL',
 ] as const;
 
