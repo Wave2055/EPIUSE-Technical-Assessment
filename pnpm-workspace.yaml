@@ -2,7 +2,11 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# Prisma's install scripts fetch the schema engine that `prisma migrate deploy` uses. Without
+# them the engine is downloaded lazily at first use, i.e. at container boot in production.
 onlyBuiltDependencies:
   - '@nestjs/core'
+  - '@prisma/engines'
   - argon2
   - esbuild
+  - prisma
