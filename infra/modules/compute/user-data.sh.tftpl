@@ -1,0 +1,58 @@
+#!/bin/bash
+# First-boot setup for the instance (ADR-0015, ADR-0023), rendered by Terraform. Changing it
+# replaces the instance; the database volume is reattached and carries the data across.
+# Progress is logged to /var/log/epiuse-bootstrap.log.
+set -euxo pipefail
+exec > >(tee -a /var/log/epiuse-bootstrap.log) 2>&1
+export HOME=/root
+
+# --- Swap: absorbs the memory peak of migrations at startup on 1 GB ---------------------
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=1024
+  chmod 600 /swapfile
+  mkswap /swapfile
+  echo '/swapfile none swap defaults 0 0' >> /etc/fstab
+fi
+swapon -a
+
+# --- Docker and the Compose plugin -------------------------------------------------------
+dnf install -y docker jq
+systemctl enable --now docker
+
+# Compose is not packaged for Amazon Linux; pin the release and verify its checksum.
+plugins=/usr/local/lib/docker/cli-plugins
+mkdir -p "$plugins"
+curl -fsSL --retry 5 -o "$plugins/docker-compose" \
+  "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-x86_64"
+echo "${compose_sha256}  $plugins/docker-compose" | sha256sum -c -
+chmod 755 "$plugins/docker-compose"
+
+# --- Database volume (ADR-0023) ----------------------------------------------------------
+# Terraform attaches it once the instance exists, so wait for the device to appear.
+device=/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${data_volume_serial}
+for _ in $(seq 120); do
+  [ -e "$device" ] && break
+  sleep 5
+done
+# Format only a blank volume: a reattached one already holds the database.
+blkid "$device" || mkfs.xfs "$device"
+uuid=$(blkid -s UUID -o value "$device")
+mkdir -p /srv/epiuse
+grep -q "$uuid" /etc/fstab || echo "UUID=$uuid /srv/epiuse xfs defaults,nofail 0 2" >> /etc/fstab
+mount /srv/epiuse || mountpoint -q /srv/epiuse
+mkdir -p /srv/epiuse/postgres
+
+# --- The stack ---------------------------------------------------------------------------
+install -d -m 700 /opt/epiuse
+%{ for name, content in files ~}
+echo '${base64encode(content)}' | base64 -d > /opt/epiuse/${name}
+%{ endfor ~}
+echo '${base64encode(instance_env)}' | base64 -d > /opt/epiuse/instance.env
+chmod 700 /opt/epiuse/deploy.sh /opt/epiuse/backup.sh
+
+install -m 644 /opt/epiuse/epiuse-backup.service /opt/epiuse/epiuse-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now epiuse-backup.timer
+
+# Starts whatever image was last deployed; a no-op until the first deploy sets the tag.
+/opt/epiuse/deploy.sh
