@@ -22,7 +22,8 @@ import type { Employee } from '@/features/employees/types';
 import { EmployeeNodeCard } from '@/features/hierarchy/employee-node';
 import { EmployeeSearch } from '@/features/hierarchy/employee-search';
 import { layoutHierarchy, NODE_HEIGHT, NODE_WIDTH } from '@/features/hierarchy/layout';
-import { useEmployees, useRole } from '@/mocks/store';
+import { useIsAdmin } from '@/features/auth/session';
+import { useEmployees } from '@/mocks/store';
 
 const nodeTypes: NodeTypes = { employee: EmployeeNodeCard };
 
@@ -43,7 +44,7 @@ export function HierarchyRoute() {
 
 function OrgChart() {
   const employees = useEmployees();
-  const isAdmin = useRole() === 'ADMIN';
+  const isAdmin = useIsAdmin();
   const { setCenter } = useReactFlow();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ employee: Employee | null; managerId?: string }>();

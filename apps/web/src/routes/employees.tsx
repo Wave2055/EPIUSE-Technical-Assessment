@@ -56,8 +56,9 @@ import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { EmployeeFormSheet } from '@/features/employees/employee-form-sheet';
 import { formatDate, formatSalary, fullName } from '@/features/employees/format';
 import type { Employee } from '@/features/employees/types';
+import { useIsAdmin } from '@/features/auth/session';
 import { cn } from '@/lib/utils';
-import { useEmployees, useRole } from '@/mocks/store';
+import { useEmployees } from '@/mocks/store';
 
 const features = tableFeatures({
   rowSortingFeature,
@@ -85,8 +86,7 @@ const col = createColumnHelper<typeof features, Row>();
  */
 export function EmployeesRoute() {
   const employees = useEmployees();
-  const role = useRole();
-  const isAdmin = role === 'ADMIN';
+  const isAdmin = useIsAdmin();
   const [editing, setEditing] = useState<Employee | null | undefined>(undefined);
   const [deleting, setDeleting] = useState<Employee | null>(null);
 

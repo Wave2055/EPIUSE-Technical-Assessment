@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { useIsAdmin } from '@/features/auth/session';
 import { fullName } from '@/features/employees/format';
 import { getDescendantIds, getDirectReports } from '@/features/employees/hierarchy';
 import type {
@@ -7,7 +8,6 @@ import type {
   DeleteStrategy,
   Employee,
   EmployeeInput,
-  Role,
 } from '@/features/employees/types';
 import { auditFixtures, employeeFixtures } from './fixtures';
 
@@ -20,10 +20,9 @@ import { auditFixtures, employeeFixtures } from './fixtures';
 interface State {
   employees: Employee[];
   audit: AuditEntry[];
-  role: Role;
 }
 
-let state: State = { employees: employeeFixtures, audit: auditFixtures, role: 'ADMIN' };
+let state: State = { employees: employeeFixtures, audit: auditFixtures };
 const listeners = new Set<() => void>();
 let nextAuditId = Math.max(...auditFixtures.map((a) => a.id)) + 1;
 
@@ -43,8 +42,8 @@ function useStore<T>(selector: (s: State) => T): T {
 
 /** The API strips salary for a VIEWER; the mock does the same so the UI is built against it. */
 const maskedCache = new WeakMap<Employee[], Employee[]>();
-function masked(employees: Employee[], role: Role): Employee[] {
-  if (role === 'ADMIN') return employees;
+function masked(employees: Employee[], isAdmin: boolean): Employee[] {
+  if (isAdmin) return employees;
   let result = maskedCache.get(employees);
   if (!result) {
     result = employees.map((e) => ({ ...e, salary: null }));
@@ -56,11 +55,9 @@ function masked(employees: Employee[], role: Role): Employee[] {
 export const useEmployees = () =>
   masked(
     useStore((s) => s.employees),
-    useStore((s) => s.role),
+    useIsAdmin(),
   );
 export const useAudit = () => useStore((s) => s.audit);
-export const useRole = () => useStore((s) => s.role);
-export const setRole = (role: Role) => setState({ role });
 
 function audit(employee: Employee, action: AuditAction, summary: string): AuditEntry {
   return {

@@ -19,7 +19,8 @@ import {
 import { formatDateTime } from '@/features/employees/format';
 import type { AuditAction } from '@/features/employees/types';
 import { cn } from '@/lib/utils';
-import { useAudit, useRole } from '@/mocks/store';
+import { useIsAdmin } from '@/features/auth/session';
+import { useAudit } from '@/mocks/store';
 
 const ACTION_STYLES: Record<AuditAction, string> = {
   CREATE: 'border-transparent bg-primary text-primary-foreground',
@@ -41,14 +42,14 @@ const ACTION_LABELS: Record<AuditAction, string> = {
  */
 export function AuditRoute() {
   const entries = useAudit();
-  const role = useRole();
+  const isAdmin = useIsAdmin();
   const [action, setAction] = useState<AuditAction | 'all'>('all');
   const rows = useMemo(
     () => (action === 'all' ? entries : entries.filter((e) => e.action === action)),
     [entries, action],
   );
 
-  if (role !== 'ADMIN') {
+  if (!isAdmin) {
     return (
       <section className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <Lock className="size-6 text-muted-foreground" />
