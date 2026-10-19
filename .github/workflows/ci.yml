@@ -1,5 +1,6 @@
 # Continuous integration (ADR-0019): every push and pull request runs lint, typecheck,
-# unit tests, integration tests against a real PostgreSQL (ADR-0020) and both builds.
+# unit tests, integration tests against a real PostgreSQL (ADR-0020), both builds, and a
+# boot test of the production API image.
 #
 # Deployment on merge to main (ECR + SSM for the API, S3 + CloudFront for the SPA) is a
 # separate workflow, added once the Terraform infrastructure exists.
@@ -99,3 +100,45 @@ jobs:
 
       - name: Integration tests
         run: pnpm test:integration
+
+  image:
+    name: API image builds and boots
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image
+        run: docker build -f apps/api/Dockerfile -t epiuse-api:ci .
+
+      # The production image against a real database: migrations apply from inside the
+      # container, the seed runs, and the API passes its own HEALTHCHECK. This catches a
+      # file left out of the image, which the other jobs cannot see.
+      - name: Smoke test
+        env:
+          # Password-less (trust auth): a throwaway database on a private network.
+          DATABASE_URL: postgresql://epiuse@db:5432/epiuse
+          JWT_ACCESS_SECRET: ci-only-signing-key-that-is-long-enough-to-pass
+          ORIGIN_SECRET: ci-only-origin-secret
+          SEED_ADMIN_PASSWORD: ci-only-admin-password
+          SEED_VIEWER_PASSWORD: ci-only-viewer-password
+        run: |
+          docker network create smoke
+          docker run -d --name db --network smoke \
+            -e POSTGRES_USER=epiuse -e POSTGRES_DB=epiuse -e POSTGRES_HOST_AUTH_METHOD=trust \
+            --health-cmd 'pg_isready -U epiuse' --health-interval 2s postgres:17-alpine
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' db)" = healthy ]; do sleep 2; done
+
+          docker run -d --name api --network smoke \
+            -e DATABASE_URL -e JWT_ACCESS_SECRET -e ORIGIN_SECRET epiuse-api:ci
+          for _ in $(seq 60); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' api)
+            [ "$status" = healthy ] && break
+            [ "$(docker inspect -f '{{.State.Running}}' api)" = false ] && break
+            sleep 2
+          done
+          docker logs api
+          [ "$status" = healthy ]
+
+          docker run --rm --network smoke -e DATABASE_URL \
+            -e SEED_ADMIN_PASSWORD -e SEED_VIEWER_PASSWORD epiuse-api:ci prisma db seed
