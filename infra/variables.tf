@@ -16,6 +16,18 @@ variable "github_repository" {
   default     = "Wave2055/EPIUSE-Technical-Assessment"
 }
 
+variable "github_repository_ids" {
+  description = <<-EOT
+    Numeric owner and repository IDs, for repositories whose OIDC tokens use GitHub's
+    immutable subject (repo:owner@<owner id>/name@<repo id>:...). Find them with
+    `gh api repos/<owner>/<name> --jq '"\(.owner.id) \(.id)"'`. Null if the repository
+    still uses the name-only subject.
+  EOT
+  type        = object({ owner = number, repository = number })
+  default     = { owner = 186425095, repository = 1420389825 }
+  nullable    = true
+}
+
 variable "instance_type" {
   description = "EC2 instance type (ADR-0015)."
   type        = string
