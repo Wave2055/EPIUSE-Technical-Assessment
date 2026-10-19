@@ -1,0 +1,12 @@
+# Nightly database backup (ADR-0023). Persistent: a run missed while the instance was down
+# happens at the next boot.
+[Unit]
+Description=Nightly EPI-USE database backup
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,119 @@
+# Continuous deployment (ADR-0019): once CI passes on main, ship the API image to the
+# instance and the SPA to S3 and CloudFront.
+#
+# AWS access is a short-lived role assumed through GitHub's OIDC token; no AWS keys exist in
+# the repository or its settings. The role trusts this repository's main branch only.
+#
+# Settings are repository variables (not secrets; none of them is sensitive), filled from
+# `terraform output` as described in infra/README.md. Until they exist the job is skipped,
+# so pushing before the infrastructure is up does not fail.
+
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Deploys run one at a time and are never cancelled half way.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    if: >-
+      vars.AWS_DEPLOY_ROLE_ARN != '' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      # The commit CI tested, not whatever main points at by the time this runs.
+      COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.COMMIT }}
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Tags are immutable in ECR, so a re-run for the same commit reuses its image.
+      - name: Build and push the API image
+        id: image
+        run: |
+          tag="${COMMIT::12}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if aws ecr describe-images --repository-name "${ECR_REPOSITORY#*/}" \
+              --image-ids imageTag="$tag" > /dev/null 2>&1; then
+            echo "Image $tag already in ECR"
+            exit 0
+          fi
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${ECR_REPOSITORY%%/*}"
+          docker build -f apps/api/Dockerfile -t "$ECR_REPOSITORY:$tag" .
+          docker push "$ECR_REPOSITORY:$tag"
+
+      # deploy.sh pulls the tag, runs migrations as the API starts and waits for every
+      # service to be healthy, so a failed deploy fails this step.
+      - name: Deploy the API
+        env:
+          TAG: ${{ steps.image.outputs.tag }}
+          INSTANCE_ID: ${{ vars.INSTANCE_ID }}
+          IMAGE_TAG_PARAMETER: ${{ vars.IMAGE_TAG_PARAMETER }}
+        run: |
+          aws ssm put-parameter --overwrite --name "$IMAGE_TAG_PARAMETER" --value "$TAG" > /dev/null
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript --comment "Deploy $TAG" \
+            --parameters 'commands=["/opt/epiuse/deploy.sh"]' \
+            --query Command.CommandId --output text)
+
+          # Long enough for an image pull and migrations; the waiter's own limit is not.
+          for _ in $(seq 120); do
+            sleep 5
+            status=$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2> /dev/null || echo Pending)
+            case "$status" in Pending | InProgress | Delayed) continue ;; *) break ;; esac
+          done
+
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text
+          echo "Deploy finished: $status"
+          [ "$status" = Success ]
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Build the SPA
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @epiuse/shared build
+          pnpm --filter @epiuse/web build
+
+      # Hashed assets cache for a year; index.html is revalidated every time, so a deploy
+      # is picked up on the next page load. The invalidation clears CloudFront's copy.
+      - name: Publish the SPA
+        env:
+          WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+          DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
+        run: |
+          aws s3 sync apps/web/dist "s3://$WEB_BUCKET" --delete --exclude index.html \
+            --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp apps/web/dist/index.html "s3://$WEB_BUCKET/index.html" \
+            --cache-control 'no-cache'
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" \
+            --paths '/*' --query Invalidation.Id --output text

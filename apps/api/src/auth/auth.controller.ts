@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
   AccessTokenResponseSchema,
   LoginSchema,
@@ -9,6 +10,7 @@ import {
 import type { CookieOptions, Request, Response } from 'express';
 import { Public } from '../common/decorators/public.decorator.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { LOGIN_RATE_LIMIT } from '../common/throttling/rate-limits.js';
 import { openApi } from '../common/swagger/zod-schema.js';
 import { AppConfig } from '../config/app-config.js';
 import { AuthService, type IssuedSession } from './auth.service.js';
@@ -26,6 +28,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
+  @Throttle({ default: LOGIN_RATE_LIMIT })
   @ApiBody({ schema: openApi(LoginSchema, 'input') })
   @ApiOkResponse({ schema: openApi(AccessTokenResponseSchema) })
   async login(

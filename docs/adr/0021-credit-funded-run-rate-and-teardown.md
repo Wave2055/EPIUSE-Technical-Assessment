@@ -1,6 +1,6 @@
 # ADR-0021: Accept a credit-funded run rate and commit to teardown
 
-- **Status:** Accepted
+- **Status:** Accepted; run rate and RDS default superseded by [ADR-0023](0023-postgresql-container-on-the-api-instance.md) (teardown commitments stand)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0015](0015-ec2-docker-for-api-compute.md), [ADR-0017](0017-omit-nat-gateway-use-ssm.md), [ADR-0018](0018-terraform-for-infrastructure.md)
