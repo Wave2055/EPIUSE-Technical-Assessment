@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { Loading } from '@/components/loading';
+import { RequireAuth } from '@/features/auth/require-auth';
 import { AppLayout } from './app-layout';
 import { EmployeesRoute } from './employees';
 import { HomeRoute } from './home';
@@ -11,8 +12,8 @@ import { NotFoundRoute } from './not-found';
  * React Flow plus d3-hierarchy is meaningful bundle weight, so the chart route is
  * lazy-loaded and kept out of the initial payload (ADR-0005).
  *
- * SPA routing on S3 needs a CloudFront error-response rule mapping 403/404 to /index.html,
- * or a hard refresh of a deep link 404s (ADR-0005, ADR-0016).
+ * A hard refresh of a deep link works because a CloudFront function serves index.html for
+ * any path without a file extension (ADR-0016, infra/modules/cdn).
  */
 const HierarchyRoute = lazy(() =>
   import('./hierarchy').then((m) => ({ default: m.HierarchyRoute })),
@@ -23,7 +24,11 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginRoute /> },
   {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <RequireAuth>
+        <AppLayout />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <HomeRoute /> },
       {
