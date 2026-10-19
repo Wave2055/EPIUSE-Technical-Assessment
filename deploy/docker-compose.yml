@@ -1,0 +1,52 @@
+# Production runtime on the EC2 instance (ADR-0015): the API behind Caddy.
+#
+# user-data and each deploy (via SSM Run Command, ADR-0019) run, from this directory:
+#
+#   API_IMAGE=<ecr-repo>:<sha> docker compose pull
+#   API_IMAGE=<ecr-repo>:<sha> docker compose up -d --wait
+#
+# `--wait` returns only once the API passes its HEALTHCHECK, so a deploy whose migrations
+# or startup fail is reported as failed. Configuration comes from Secrets Manager through
+# the instance role (SECRETS_ARN); a local `.env` here, never committed, is optional.
+services:
+  api:
+    image: ${API_IMAGE:?Set API_IMAGE to the image to run}
+    restart: unless-stopped
+    # tini as PID 1 forwards SIGTERM to the API and reaps the migration subprocess.
+    init: true
+    environment:
+      SECRETS_ARN: ${SECRETS_ARN:-}
+      AWS_REGION: ${AWS_REGION:-af-south-1}
+      AVATAR_BUCKET: ${AVATAR_BUCKET:-}
+      ASSET_BASE_URL: ${ASSET_BASE_URL:-}
+    env_file:
+      - path: .env
+        required: false
+    expose:
+      - '3000'
+    logging: &logging
+      driver: json-file
+      options:
+        # The instance has an 8 GB volume (ADR-0021); unbounded logs would fill it.
+        max-size: 10m
+        max-file: '3'
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    volumes:
+      # `z` relabels the file for SELinux hosts; it is a no-op elsewhere.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+    depends_on:
+      api:
+        condition: service_healthy
+    # Through the proxy to the API, so `--wait` covers the whole request path.
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/api/health']
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging: *logging

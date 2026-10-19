@@ -1,0 +1,26 @@
+# Reverse proxy on the EC2 instance (ADR-0015). CloudFront terminates TLS and reaches this
+# over plain HTTP on :80, which the security group opens to CloudFront only (ADR-0016), so
+# Caddy's automatic HTTPS is off.
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	# CloudFront routes only /api/* to this origin. Anything else did not come through it.
+	handle /api/* {
+		reverse_proxy api:3000 {
+			# Fail fast while the API restarts during a deploy, rather than hanging requests.
+			lb_try_duration 10s
+		}
+	}
+
+	handle {
+		respond 404
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
