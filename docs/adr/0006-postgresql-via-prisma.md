@@ -1,6 +1,6 @@
 # ADR-0006: PostgreSQL via Prisma as the system of record
 
-- **Status:** Accepted
+- **Status:** Accepted; RDS hosting superseded by [ADR-0023](0023-postgresql-container-on-the-api-instance.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0007](0007-adjacency-list-for-the-hierarchy.md), [ADR-0008](0008-defence-in-depth-cycle-prevention.md), [ADR-0011](0011-audit-trail-via-database-triggers.md), [ADR-0015](0015-ec2-docker-for-api-compute.md)

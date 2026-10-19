@@ -31,6 +31,7 @@ Each record captures one decision with its context, consequences and the alterna
 | [0016](0016-single-cloudfront-distribution-dual-origin.md) | Serve the SPA and the API from one CloudFront distribution                | Accepted |
 | [0017](0017-omit-nat-gateway-use-ssm.md)                   | Omit the NAT gateway; place EC2 in a public subnet and administer via SSM | Accepted |
 | [0018](0018-terraform-for-infrastructure.md)               | Define all infrastructure in Terraform                                    | Accepted |
+| [0023](0023-postgresql-container-on-the-api-instance.md)   | **Run PostgreSQL in a container on the API instance**                     | Accepted |
 | **Delivery**                                               |                                                                           |          |
 | [0019](0019-github-actions-oidc-cicd.md)                   | Deploy from GitHub Actions using OIDC role assumption                     | Accepted |
 | [0020](0020-test-database-triggers-with-testcontainers.md) | Test against real PostgreSQL via Testcontainers                           | Accepted |
@@ -58,7 +59,7 @@ Three records carry most of the engineering judgement in this solution:
 | Gravatar integration                                            | [0012](0012-require-email-on-employee-record.md), [0013](0013-avatar-resolution-chain.md)                                                            |
 | Avatar upload _(optional nice-to-have)_                         | [0013](0013-avatar-resolution-chain.md)                                                                                                              |
 | Cloud deployment at a provided URL                              | [0015](0015-ec2-docker-for-api-compute.md), [0016](0016-single-cloudfront-distribution-dual-origin.md), [0017](0017-omit-nat-gateway-use-ssm.md)     |
-| No mocked data; remote database                                 | [0006](0006-postgresql-via-prisma.md), [0021](0021-credit-funded-run-rate-and-teardown.md)                                                           |
+| No mocked data; remote database                                 | [0006](0006-postgresql-via-prisma.md), [0021](0021-credit-funded-run-rate-and-teardown.md), [0023](0023-postgresql-container-on-the-api-instance.md) |
 | Technical document                                              | this stack, summarised in `../technical-document.md`                                                                                                 |
 
 ## Design patterns
@@ -81,6 +82,7 @@ The brief requires the technical document to name the design patterns used. Each
 Recorded here so they are found rather than discovered:
 
 - **The API runs on a single instance in a single AZ** — no autoscaling, no failover ([0015](0015-ec2-docker-for-api-compute.md)).
+- **The database is self-managed on that same instance**, backed up nightly to S3 — up to 24 hours of writes could be lost, and recovery is manual ([0023](0023-postgresql-container-on-the-api-instance.md)).
 - **CloudFront-to-origin traffic is unencrypted HTTP** inside AWS's network ([0016](0016-single-cloudfront-distribution-dual-origin.md)).
 - **The application tier sits in a public subnet**, trading the conventional private-subnet layer for the cost of a NAT gateway ([0017](0017-omit-nat-gateway-use-ssm.md)).
 - **Authentication is hand-rolled**, with no MFA, password reset or lockout ([0014](0014-self-hosted-jwt-auth-and-salary-masking.md)).
