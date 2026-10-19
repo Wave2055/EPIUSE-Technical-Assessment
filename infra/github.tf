@@ -18,6 +18,21 @@ locals {
   github_oidc_provider_arn = (var.create_github_oidc_provider
     ? aws_iam_openid_connect_provider.github[0].arn
   : data.aws_iam_openid_connect_provider.github[0].arn)
+
+  # The token's subject names this repository and branch. Repositories on GitHub's
+  # immutable subject format also carry the owner and repository IDs, which keeps the trust
+  # bound to this repository even if it, or its owner, is renamed. Both forms are accepted,
+  # so the role keeps working whichever one GitHub sends.
+  github_owner = split("/", var.github_repository)[0]
+  github_name  = split("/", var.github_repository)[1]
+  github_deploy_subjects = compact([
+    "repo:${var.github_repository}:ref:refs/heads/main",
+    var.github_repository_ids == null ? "" : format(
+      "repo:%s@%d/%s@%d:ref:refs/heads/main",
+      local.github_owner, var.github_repository_ids.owner,
+      local.github_name, var.github_repository_ids.repository,
+    ),
+  ])
 }
 
 data "aws_iam_policy_document" "github_trust" {
@@ -38,7 +53,7 @@ data "aws_iam_policy_document" "github_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values   = local.github_deploy_subjects
     }
   }
 }
