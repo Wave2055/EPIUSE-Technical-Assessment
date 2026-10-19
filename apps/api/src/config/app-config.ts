@@ -13,7 +13,7 @@ const EnvSchema = z
     COOKIE_SECURE: z.stringbool().optional(),
     /** Shared header CloudFront adds to origin requests (ADR-0016). Required in production. */
     ORIGIN_SECRET: z.string().min(16).optional(),
-    AWS_REGION: z.string().default('af-south-1'),
+    AWS_REGION: z.string().default('eu-west-1'),
     /** Bucket for uploaded avatars. Unset disables uploads; Gravatar still works. */
     AVATAR_BUCKET: z.string().optional(),
     /** Prefix for uploaded avatar URLs. Empty means same origin, served by CloudFront. */
