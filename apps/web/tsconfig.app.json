@@ -19,7 +19,6 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
