@@ -1,18 +1,17 @@
 import { ChevronDown, LogOut } from 'lucide-react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Role } from '@/features/employees/types';
+import { signOut, useCurrentUser } from '@/features/auth/session';
+import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
-import { setRole, useRole } from '@/mocks/store';
 
 const navItems = [
   { to: '/', label: 'Home', end: true },
@@ -58,27 +57,29 @@ export function AppLayout() {
   );
 }
 
-/** Signed-in user. The role switch is a design aid for previewing salary masking (ADR-0014). */
+/** The signed-in user, and the way out. Signing out sends them to the login page. */
 function UserMenu() {
-  const role = useRole();
-  const navigate = useNavigate();
+  const user = useCurrentUser();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="ml-auto flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-header-muted hover:text-header-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
         <span className="grid size-7 place-items-center rounded-full bg-header-foreground/10 text-xs font-semibold text-header-foreground">
-          AD
+          {user.email.slice(0, 2).toUpperCase()}
         </span>
-        <span className="hidden sm:inline">admin@example.com</span>
+        <span className="hidden sm:inline">{user.email}</span>
         <ChevronDown className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Preview as</DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={role} onValueChange={(v) => setRole(v as Role)}>
-          <DropdownMenuRadioItem value="ADMIN">Admin (full access)</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="VIEWER">Viewer (read-only)</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
+        <DropdownMenuLabel className="grid gap-0.5">
+          <span className="truncate">{user.email}</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            {user.role === 'ADMIN' ? 'Admin · full access' : 'Viewer · read-only'}
+          </span>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => navigate('/login')}>
+        <DropdownMenuItem
+          onSelect={() => signOut().catch((error: unknown) => toast.error(errorMessage(error)))}
+        >
           <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

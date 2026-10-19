@@ -10,9 +10,12 @@ import {
 } from '@xyflow/react';
 import { Pencil, Trash2, TriangleAlert, UserPlus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Loading } from '@/components/loading';
+import { QueryError } from '@/components/query-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { useEmployeesQuery } from '@/features/employees/api';
 import { DeleteEmployeeDialog } from '@/features/employees/delete-employee-dialog';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { EmployeeFormSheet } from '@/features/employees/employee-form-sheet';
@@ -22,7 +25,7 @@ import type { Employee } from '@/features/employees/types';
 import { EmployeeNodeCard } from '@/features/hierarchy/employee-node';
 import { EmployeeSearch } from '@/features/hierarchy/employee-search';
 import { layoutHierarchy, NODE_HEIGHT, NODE_WIDTH } from '@/features/hierarchy/layout';
-import { useEmployees, useRole } from '@/mocks/store';
+import { useIsAdmin } from '@/features/auth/session';
 
 const nodeTypes: NodeTypes = { employee: EmployeeNodeCard };
 
@@ -42,8 +45,18 @@ export function HierarchyRoute() {
 }
 
 function OrgChart() {
-  const employees = useEmployees();
-  const isAdmin = useRole() === 'ADMIN';
+  const employeesQuery = useEmployeesQuery();
+  if (employeesQuery.isPending) return <Loading />;
+  if (employeesQuery.isError) {
+    return (
+      <QueryError error={employeesQuery.error} onRetry={() => void employeesQuery.refetch()} />
+    );
+  }
+  return <OrgChartView employees={employeesQuery.data} />;
+}
+
+function OrgChartView({ employees }: { employees: Employee[] }) {
+  const isAdmin = useIsAdmin();
   const { setCenter } = useReactFlow();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ employee: Employee | null; managerId?: string }>();
@@ -160,11 +173,8 @@ function OrgChart() {
         <DeleteEmployeeDialog
           key={deleting.id}
           employee={deleting}
-          onOpenChange={(open) => {
-            if (open) return;
-            if (!employees.some((e) => e.id === deleting.id)) setSelectedId(null);
-            setDeleting(null);
-          }}
+          onOpenChange={(open) => !open && setDeleting(null)}
+          onDeleted={() => setSelectedId(null)}
         />
       )}
     </section>

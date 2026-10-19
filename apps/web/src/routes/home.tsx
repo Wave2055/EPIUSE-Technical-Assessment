@@ -1,41 +1,41 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Loading } from '@/components/loading';
+import { QueryError } from '@/components/query-error';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getDirectReports } from '@/features/employees/hierarchy';
-import type { Employee, Task } from '@/features/employees/types';
+import { useCurrentUser } from '@/features/auth/session';
+import type { Employee } from '@/features/employees/types';
+import { useCreateTask, useMe, useTeamTasks, useUpdateTask } from '@/features/home/api';
 import { ProfileHeader } from '@/features/home/profile-header';
 import { isOverdue } from '@/features/home/tasks';
 import { TasksCard, type TaskView } from '@/features/home/tasks-card';
 import { TeamList } from '@/features/home/team-list';
-import { CURRENT_EMPLOYEE_ID, taskFixtures } from '@/mocks/fixtures';
-import { useEmployees } from '@/mocks/store';
+import { errorMessage } from '@/lib/errors';
 
 /**
- * Home: the signed-in person, their direct reports, and what each of them is working on.
- *
- * Design mock. The signed-in person and their tasks come from static fixtures; ticking a
- * task only changes local state until a tasks API exists.
+ * Home: the signed-in person, their direct reports, and what each of them is working on
+ * (ADR-0022). A login with no employee record has no team or tasks, and is told so.
  */
 export function HomeRoute() {
-  const employees = useEmployees();
-  const self = employees.find((e) => e.id === CURRENT_EMPLOYEE_ID);
+  const me = useMe();
+  const tasks = useTeamTasks(Boolean(me.data?.employee));
+  const createTask = useCreateTask();
+  const updateTask = useUpdateTask();
   const [view, setView] = useState<TaskView>('mine');
-  const [done, setDone] = useState<Record<string, boolean>>({});
 
-  const tasks = useMemo<Task[]>(
-    () =>
-      taskFixtures.map((t) => (t.id in done ? { ...t, status: done[t.id] ? 'done' : 'todo' } : t)),
-    [done],
-  );
+  if (me.isPending) return <Loading />;
+  if (me.isError) return <QueryError error={me.error} onRetry={() => void me.refetch()} />;
 
-  if (!self) return null;
+  const { employee: self, manager, directReports: reports } = me.data;
+  if (!self) return <NotLinked />;
 
-  const manager = employees.find((e) => e.id === self.managerId);
-  const reports = getDirectReports(employees, self.id);
-  const own = tasks.filter((t) => t.employeeId === self.id);
+  const allTasks = tasks.data?.groups.flatMap((group) => group.tasks) ?? [];
+  const own = allTasks.filter((t) => t.employeeId === self.id);
   const openTaskCounts = Object.fromEntries(
     [self, ...reports].map((e) => [
       e.id,
-      tasks.filter((t) => t.employeeId === e.id && t.status !== 'done').length,
+      allTasks.filter((t) => t.employeeId === e.id && t.status !== 'done').length,
     ]),
   );
 
@@ -77,15 +77,56 @@ export function HomeRoute() {
           </CardContent>
         </Card>
 
-        <TasksCard
-          self={self}
-          reports={reports}
-          tasks={tasks}
-          view={view}
-          onViewChange={setView}
-          onToggle={(task, isDone) => setDone((d) => ({ ...d, [task.id]: isDone }))}
-        />
+        {tasks.isError ? (
+          <QueryError
+            title="Your tasks could not be loaded"
+            error={tasks.error}
+            onRetry={() => void tasks.refetch()}
+          />
+        ) : (
+          <TasksCard
+            self={self}
+            reports={reports}
+            tasks={allTasks}
+            loading={tasks.isPending}
+            view={view}
+            onViewChange={setView}
+            onToggle={(task, done) =>
+              updateTask.mutate(
+                { id: task.id, changes: { status: done ? 'done' : 'todo' } },
+                { onError: (error) => toast.error(errorMessage(error)) },
+              )
+            }
+            onAdd={(title) => createTask.mutateAsync({ title })}
+          />
+        )}
       </div>
+    </section>
+  );
+}
+
+/** Logins need not belong to an employee (ADR-0022); everything else still works. */
+function NotLinked() {
+  const user = useCurrentUser();
+  return (
+    <section className="mx-auto grid max-w-2xl gap-4 p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-heading">Welcome, {user.email}</CardTitle>
+          <CardDescription>
+            Your login is not linked to an employee record, so there is no team or task list to show
+            here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-4 text-sm">
+          <Link to="/hierarchy" className="text-heading underline underline-offset-2">
+            Open the org chart
+          </Link>
+          <Link to="/employees" className="text-heading underline underline-offset-2">
+            Browse employees
+          </Link>
+        </CardContent>
+      </Card>
     </section>
   );
 }

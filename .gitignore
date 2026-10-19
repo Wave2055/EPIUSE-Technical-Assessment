@@ -36,3 +36,4 @@ playwright-report/
 
 # Generated Prisma client (rebuilt by `prisma generate` on install)
 apps/api/src/generated/
+infra/tfplan

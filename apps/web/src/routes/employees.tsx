@@ -26,6 +26,8 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Loading } from '@/components/loading';
+import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -51,13 +53,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useEmployeesQuery } from '@/features/employees/api';
 import { DeleteEmployeeDialog } from '@/features/employees/delete-employee-dialog';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { EmployeeFormSheet } from '@/features/employees/employee-form-sheet';
 import { formatDate, formatSalary, fullName } from '@/features/employees/format';
 import type { Employee } from '@/features/employees/types';
+import { useIsAdmin } from '@/features/auth/session';
 import { cn } from '@/lib/utils';
-import { useEmployees, useRole } from '@/mocks/store';
 
 const features = tableFeatures({
   rowSortingFeature,
@@ -84,19 +87,30 @@ const col = createColumnHelper<typeof features, Row>();
  * the API has masked (ADR-0014).
  */
 export function EmployeesRoute() {
-  const employees = useEmployees();
-  const role = useRole();
-  const isAdmin = role === 'ADMIN';
+  const employeesQuery = useEmployeesQuery();
+  if (employeesQuery.isPending) return <Loading />;
+  if (employeesQuery.isError) {
+    return (
+      <QueryError error={employeesQuery.error} onRetry={() => void employeesQuery.refetch()} />
+    );
+  }
+  return <EmployeesTable employees={employeesQuery.data} />;
+}
+
+function EmployeesTable({ employees }: { employees: Employee[] }) {
+  const isAdmin = useIsAdmin();
   const [editing, setEditing] = useState<Employee | null | undefined>(undefined);
   const [deleting, setDeleting] = useState<Employee | null>(null);
 
-  const data = useMemo<Row[]>(() => {
-    const byId = new Map(employees.map((e) => [e.id, e]));
-    return employees.map((e) => {
-      const manager = e.managerId ? byId.get(e.managerId) : undefined;
-      return { ...e, name: fullName(e), managerName: manager ? fullName(manager) : '' };
-    });
-  }, [employees]);
+  const data = useMemo<Row[]>(
+    () =>
+      employees.map((e) => ({
+        ...e,
+        name: fullName(e),
+        managerName: e.manager ? fullName(e.manager) : '',
+      })),
+    [employees],
+  );
 
   const positions = useMemo(
     () => [...new Set(employees.map((e) => e.position))].sort(),
