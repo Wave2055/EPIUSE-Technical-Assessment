@@ -1,6 +1,6 @@
 # ADR-0015: Run the API container on an EC2 t3.micro
 
-- **Status:** Accepted
+- **Status:** Accepted; image build and release mechanics in [ADR-0026](0026-self-migrating-api-image-released-by-tag.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0006](0006-postgresql-via-prisma.md), [ADR-0017](0017-omit-nat-gateway-use-ssm.md), [ADR-0021](0021-credit-funded-run-rate-and-teardown.md)
