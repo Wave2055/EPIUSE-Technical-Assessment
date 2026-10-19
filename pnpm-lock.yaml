@@ -162,6 +162,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@epiuse/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@hookform/resolvers':
         specifier: ^5.9.2
         version: 5.9.2(@standard-schema/spec@1.1.0)(ajv@8.20.0)(effect@3.20.0)(react-hook-form@7.90.0(@types/react@19.3.0)(react@19.3.1))(valibot@1.4.2(typescript@6.0.3))(zod@4.6.7)

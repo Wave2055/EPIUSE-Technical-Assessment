@@ -1,3 +1,5 @@
+import type { AccessTokenResponse } from '@epiuse/shared';
+
 /**
  * Thin fetch wrapper over the API.
  *
@@ -32,7 +34,43 @@ export class ApiRequestError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+let refreshing: Promise<AccessTokenResponse | null> | null = null;
+let sessionExpiredHandler: (() => void) | null = null;
+
+/** Called when the session cannot be renewed, so the app can send the user to sign in. */
+export const onSessionExpired = (handler: (() => void) | null): void => {
+  sessionExpiredHandler = handler;
+};
+
+/**
+ * Exchanges the refresh cookie for a new access token, or resolves `null` if there is no
+ * valid session. Concurrent callers share one request: the API rotates the cookie on every
+ * refresh and treats reuse of a rotated one as theft, revoking the whole session (ADR-0014),
+ * so two parallel refreshes would sign the user out.
+ */
+export function refreshSession(): Promise<AccessTokenResponse | null> {
+  refreshing ??= (async () => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        accessToken = null;
+        return null;
+      }
+      const session = (await response.json()) as AccessTokenResponse;
+      accessToken = session.accessToken;
+      return session;
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
+function send(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body !== undefined && !headers.has('Content-Type')) {
@@ -41,12 +79,22 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
+  return fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' });
+}
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  let response = await send(path, init);
+
+  // Access tokens are short-lived, so a 401 usually means this one expired: renew it once and
+  // retry. The auth routes are left alone, so a failed login is reported as it is.
+  if (response.status === 401 && !path.startsWith('/auth/')) {
+    const session = await refreshSession();
+    if (session) {
+      response = await send(path, init);
+    } else {
+      sessionExpiredHandler?.();
+    }
+  }
 
   if (response.status === 204) {
     return undefined as T;
