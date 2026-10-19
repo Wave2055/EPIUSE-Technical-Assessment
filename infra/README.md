@@ -55,8 +55,12 @@ aws ecr get-login-password | docker login --username AWS --password-stdin "${REP
 docker build -f ../apps/api/Dockerfile -t "$REPO:$TAG" ..
 docker push "$REPO:$TAG"
 aws ssm put-parameter --overwrite --name "$(terraform output -raw image_tag_parameter)" --value "$TAG"
-aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
-  --parameters 'commands=["/opt/epiuse/deploy.sh"]'
+CMD=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
+  --parameters 'commands=["/opt/epiuse/deploy.sh"]' --query Command.CommandId --output text)
+
+# Repeat until Status is Success (the first image pull takes a few minutes).
+aws ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
+  --query '[Status, StandardOutputContent]' --output text
 
 # Starter data and the two logins, once. Passwords come from the secret.
 aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
@@ -75,6 +79,20 @@ The seeded logins are `admin@example.com` and `viewer@example.com`:
 ```bash
 aws secretsmanager get-secret-value --secret-id "$(terraform output -raw secret_arn)" \
   --query SecretString --output text | jq '{SEED_ADMIN_PASSWORD, SEED_VIEWER_PASSWORD}'
+```
+
+## 4. Turn on continuous deployment
+
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) deploys every commit that passes CI on `main`. It reads repository variables, none of them secret, and is skipped until they exist:
+
+```bash
+cd infra
+for pair in \
+  AWS_DEPLOY_ROLE_ARN=deploy_role_arn AWS_REGION=region ECR_REPOSITORY=ecr_repository_url \
+  INSTANCE_ID=instance_id IMAGE_TAG_PARAMETER=image_tag_parameter WEB_BUCKET=web_bucket \
+  DISTRIBUTION_ID=distribution_id; do
+  gh variable set "${pair%%=*}" --body "$(terraform output -raw "${pair#*=}")"
+done
 ```
 
 ## Operating it
