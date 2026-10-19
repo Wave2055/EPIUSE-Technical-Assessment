@@ -1,0 +1,9 @@
+# Installed to /etc/systemd/system by user-data, with deploy/ at /opt/epiuse (ADR-0023).
+[Unit]
+Description=Back up the EPI-USE database to S3
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/epiuse/backup.sh
