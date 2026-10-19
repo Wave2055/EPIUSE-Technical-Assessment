@@ -50,21 +50,14 @@ RUN pnpm --filter @epiuse/api deploy --prod --legacy /out \
 # --- Runtime ------------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 
-# OpenSSL for Prisma's schema engine. The RDS CA bundle lets both Node (the API) and the
-# schema engine (migrations) verify the database certificate with sslmode=verify-full.
+# OpenSSL for Prisma's schema engine. The database is a sibling container on the same
+# host (ADR-0023), so its traffic never leaves the compose network and needs no TLS.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl \
   && rm -rf /var/lib/apt/lists/*
-ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem \
-  /etc/ssl/rds-global-bundle.pem
-# update-ca-certificates skips files holding more than one certificate, so split the bundle.
-RUN awk '/BEGIN CERTIFICATE/ { n++ } { print > ("/usr/local/share/ca-certificates/rds-" n ".crt") }' \
-    /etc/ssl/rds-global-bundle.pem \
-  && update-ca-certificates
 
 ENV NODE_ENV=production \
   PORT=3000 \
-  NODE_EXTRA_CA_CERTS=/etc/ssl/rds-global-bundle.pem \
   PATH=/app/node_modules/.bin:$PATH
 
 WORKDIR /app
