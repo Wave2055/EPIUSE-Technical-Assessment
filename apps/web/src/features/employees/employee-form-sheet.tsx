@@ -32,14 +32,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { MockRuleError, saveEmployee, useEmployees } from '@/mocks/store';
+import { ApiRequestError } from '@/lib/api-client';
+import { errorMessage } from '@/lib/errors';
+import { useEmployees, useSaveEmployee } from './api';
 import { formatDate, fullName, parseIsoDate, toIsoDate } from './format';
 import { getEligibleManagers } from './hierarchy';
 import type { Employee } from './types';
 
 const NO_MANAGER = 'none';
 
-/** Local schema until the shared one lands in `@epiuse/shared` (ADR-0003). */
+/**
+ * The form's own shape: text inputs and a select, converted on submit. The API validates
+ * again with the shared CreateEmployeeSchema and its messages land on the same fields.
+ */
 const employeeSchema = z.object({
   firstName: z.string().trim().min(1, 'Enter a first name.'),
   lastName: z.string().trim().min(1, 'Enter a surname.'),
@@ -55,6 +60,7 @@ const employeeSchema = z.object({
 });
 
 type FormValues = z.input<typeof employeeSchema>;
+const FIELDS = Object.keys(employeeSchema.shape) as (keyof FormValues)[];
 
 const emptyValues: FormValues = {
   firstName: '',
@@ -94,6 +100,7 @@ export function EmployeeFormSheet({
   defaultManagerId?: string;
 }) {
   const employees = useEmployees();
+  const save = useSaveEmployee();
   const form = useForm<FormValues, unknown, z.output<typeof employeeSchema>>({
     resolver: zodResolver(employeeSchema),
     defaultValues: toFormValues(employee, defaultManagerId),
@@ -111,20 +118,35 @@ export function EmployeeFormSheet({
     [employees, employee?.id],
   );
 
-  function onSubmit(values: z.output<typeof employeeSchema>) {
+  async function onSubmit(values: z.output<typeof employeeSchema>) {
     try {
-      const saved = saveEmployee(
-        { ...values, managerId: values.managerId === NO_MANAGER ? null : values.managerId },
-        employee?.id,
-      );
+      const saved = await save.mutateAsync({
+        id: employee?.id,
+        input: { ...values, managerId: values.managerId === NO_MANAGER ? null : values.managerId },
+      });
       toast.success(employee ? `Saved ${fullName(saved)}` : `Added ${fullName(saved)}`);
       onOpenChange(false);
     } catch (error) {
-      if (error instanceof MockRuleError) {
-        form.setError('root', { message: error.message });
-        return;
-      }
-      throw error;
+      showApiError(error);
+    }
+  }
+
+  /**
+   * Field-level validation goes beside its field; anything else (a duplicate number or
+   * email, a reporting loop the picker could not foresee) goes under the form.
+   */
+  function showApiError(error: unknown) {
+    const issues =
+      error instanceof ApiRequestError && error.code === 'VALIDATION_FAILED'
+        ? ((error.details as { issues?: { path: string; message: string }[] } | undefined)
+            ?.issues ?? [])
+        : [];
+    const fieldIssues = issues.filter((i) => FIELDS.includes(i.path as keyof FormValues));
+    for (const issue of fieldIssues) {
+      form.setError(issue.path as keyof FormValues, { message: issue.message });
+    }
+    if (fieldIssues.length === 0 || fieldIssues.length < issues.length) {
+      form.setError('root', { message: errorMessage(error) });
     }
   }
 
@@ -308,7 +330,13 @@ export function EmployeeFormSheet({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{employee ? 'Save changes' : 'Add employee'}</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting
+                  ? 'Saving…'
+                  : employee
+                    ? 'Save changes'
+                    : 'Add employee'}
+              </Button>
             </SheetFooter>
           </form>
         </Form>

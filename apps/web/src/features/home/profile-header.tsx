@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { fullName } from '@/features/employees/format';
-import type { Employee } from '@/features/employees/types';
+import type { Employee, EmployeeRef } from '@/features/employees/types';
 
 /** Who the signed-in person is, where they sit, and a glance at their workload. */
 export function ProfileHeader({
@@ -12,7 +12,7 @@ export function ProfileHeader({
   overdueCount,
 }: {
   employee: Employee;
-  manager: Employee | undefined;
+  manager: EmployeeRef | null;
   reportCount: number;
   openTaskCount: number;
   overdueCount: number;

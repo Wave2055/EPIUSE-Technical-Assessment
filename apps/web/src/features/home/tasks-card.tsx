@@ -1,4 +1,6 @@
 import { Plus } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmployeeAvatar } from '@/features/employees/employee-avatar';
 import { fullName } from '@/features/employees/format';
 import type { Employee, Task } from '@/features/employees/types';
+import { errorMessage } from '@/lib/errors';
 import { TaskList } from './task-list';
 
 export type TaskView = 'mine' | 'team';
@@ -18,16 +21,20 @@ export function TasksCard({
   self,
   reports,
   tasks,
+  loading = false,
   view,
   onViewChange,
   onToggle,
+  onAdd,
 }: {
   self: Employee;
   reports: Employee[];
   tasks: Task[];
+  loading?: boolean;
   view: TaskView;
   onViewChange: (view: TaskView) => void;
   onToggle?: (task: Task, done: boolean) => void;
+  onAdd: (title: string) => Promise<unknown>;
 }) {
   const tasksFor = (id: string) => tasks.filter((t) => t.employeeId === id);
   const openCount = (id: string) => tasksFor(id).filter((t) => t.status !== 'done').length;
@@ -57,11 +64,11 @@ export function TasksCard({
 
         <CardContent>
           <TabsContent value="mine" className="grid gap-3">
-            <AddTaskRow />
+            <AddTaskRow onAdd={onAdd} />
             <TaskList
               tasks={tasksFor(self.id)}
               onToggle={onToggle}
-              emptyMessage="You have no tasks. Add one above."
+              emptyMessage={loading ? 'Loading tasks…' : 'You have no tasks. Add one above.'}
             />
           </TabsContent>
 
@@ -106,12 +113,36 @@ function PersonSection({
   );
 }
 
-/** Design-only: the input and button are laid out but not wired to a store yet. */
-function AddTaskRow() {
+/** A new task for the signed-in person, added to the top of their list. */
+function AddTaskRow({ onAdd }: { onAdd: (title: string) => Promise<unknown> }) {
+  const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    try {
+      await onAdd(trimmed);
+      setTitle('');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-      <Input placeholder="Add a task, e.g. Review Q4 budget" aria-label="New task" />
-      <Button type="submit" variant="secondary">
+    <form className="flex gap-2" onSubmit={(e) => void submit(e)}>
+      <Input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        maxLength={200}
+        placeholder="Add a task, e.g. Review Q4 budget"
+        aria-label="New task"
+      />
+      <Button type="submit" variant="secondary" disabled={saving || !title.trim()}>
         <Plus /> Add
       </Button>
     </form>

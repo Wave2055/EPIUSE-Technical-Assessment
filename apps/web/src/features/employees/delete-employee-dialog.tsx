@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { deleteEmployee, MockRuleError, useEmployees } from '@/mocks/store';
+import { errorMessage } from '@/lib/errors';
+import { useDeleteEmployee, useEmployees } from './api';
 import { fullName } from './format';
 import { getDirectReports, getEligibleManagers } from './hierarchy';
 import type { DeleteStrategy, Employee } from './types';
@@ -32,11 +33,14 @@ import type { DeleteStrategy, Employee } from './types';
 export function DeleteEmployeeDialog({
   employee,
   onOpenChange,
+  onDeleted,
 }: {
   employee: Employee;
   onOpenChange: (open: boolean) => void;
+  onDeleted?: () => void;
 }) {
   const employees = useEmployees();
+  const remove = useDeleteEmployee();
   const reports = useMemo(() => getDirectReports(employees, employee.id), [employees, employee]);
   const isRoot = employee.managerId === null;
   const manager = employees.find((e) => e.id === employee.managerId);
@@ -52,14 +56,17 @@ export function DeleteEmployeeDialog({
   const target = strategy === 'promote' ? manager : employees.find((e) => e.id === reassignTo);
 
   function confirm() {
-    try {
-      deleteEmployee(employee.id, strategy, reassignTo || undefined);
-      toast.success(`Deleted ${fullName(employee)}`);
-      onOpenChange(false);
-    } catch (error) {
-      if (error instanceof MockRuleError) toast.error(error.message);
-      else throw error;
-    }
+    remove.mutate(
+      { id: employee.id, strategy, reassignTo: reassignTo || undefined },
+      {
+        onSuccess: () => {
+          toast.success(`Deleted ${fullName(employee)}`);
+          onDeleted?.();
+          onOpenChange(false);
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+      },
+    );
   }
 
   return (
@@ -137,8 +144,12 @@ export function DeleteEmployeeDialog({
 
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button variant="destructive" disabled={needsTarget} onClick={confirm}>
-            Delete employee
+          <Button
+            variant="destructive"
+            disabled={needsTarget || remove.isPending}
+            onClick={confirm}
+          >
+            {remove.isPending ? 'Deleting…' : 'Delete employee'}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
