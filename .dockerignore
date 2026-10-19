@@ -1,0 +1,27 @@
+# Build context is the repository root (apps/api/Dockerfile). Keep it to what the image
+# needs, and keep secrets and local build output out of it entirely.
+
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+apps/api/src/generated
+
+# Never send secrets into a build context (ADR-0018).
+**/.env
+**/.env.*
+!**/.env.example
+.npmrc
+
+# Only the web package manifest is needed, to satisfy the workspace lockfile.
+apps/web/*
+!apps/web/package.json
+
+.git
+.github
+.githooks
+docs
+infra
+deploy
+**/test-results
+**/playwright-report
