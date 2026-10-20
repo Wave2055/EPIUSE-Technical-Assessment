@@ -1,4 +1,10 @@
-import type { CreateEmployeeInput, Employee, Paginated } from '@epiuse/shared';
+import type {
+  CreateEmployeeInput,
+  CreateEmployeeResponse,
+  Employee,
+  Paginated,
+  TemporaryPassword,
+} from '@epiuse/shared';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
 import type { DeleteStrategy } from './types';
@@ -42,16 +48,38 @@ function invalidateAfterChange(queryClient: QueryClient) {
   ]);
 }
 
-/** Create when `id` is absent, otherwise update, including re-parenting (ADR-0008). */
+/**
+ * Create when `id` is absent, otherwise update, including re-parenting (ADR-0008). Creating
+ * also creates the employee's login, whose one-time password comes back once as `login`
+ * (ADR-0036).
+ */
 export function useSaveEmployee() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: CreateEmployeeInput }) =>
-      apiFetch<Employee>(id ? `/employees/${id}` : '/employees', {
-        method: id ? 'PATCH' : 'POST',
+    mutationFn: async ({
+      id,
+      input,
+    }: {
+      id?: string;
+      input: CreateEmployeeInput;
+    }): Promise<{ employee: Employee; login: TemporaryPassword | null }> => {
+      if (id) {
+        const employee = await apiFetch<Employee>(`/employees/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(input),
+        });
+        return { employee, login: null };
+      }
+      return apiFetch<CreateEmployeeResponse>('/employees', {
+        method: 'POST',
         body: JSON.stringify(input),
-      }),
-    onSuccess: () => invalidateAfterChange(queryClient),
+      });
+    },
+    onSuccess: () =>
+      Promise.all([
+        invalidateAfterChange(queryClient),
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+      ]),
   });
 }
 
