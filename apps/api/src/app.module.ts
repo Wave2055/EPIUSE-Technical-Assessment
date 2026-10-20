@@ -18,6 +18,7 @@ import { HierarchyModule } from './hierarchy/hierarchy.module.js';
 import { MeModule } from './me/me.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { TasksModule } from './tasks/tasks.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { TasksModule } from './tasks/tasks.module.js';
     AuditModule,
     MeModule,
     TasksModule,
+    UsersModule,
   ],
   controllers: [HealthController],
   providers: [
