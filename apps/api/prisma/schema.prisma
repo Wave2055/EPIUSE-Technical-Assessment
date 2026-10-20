@@ -44,8 +44,9 @@ model Employee {
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user  User?
-  tasks Task[]
+  user          User?
+  tasks         Task[] @relation("TaskOwner")
+  assignedTasks Task[] @relation("TaskAssigner")
 
   @@index([managerId])
   @@index([lastName, firstName])
@@ -100,15 +101,19 @@ model EmployeeAudit {
 
 /// Home-screen work items, an additional feature beyond the brief (ADR-0022).
 model Task {
-  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employeeId String     @map("employee_id") @db.Uuid
-  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  title      String
-  status     TaskStatus @default(todo)
-  dueDate    DateTime?  @map("due_date") @db.Date
-  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId   String     @map("employee_id") @db.Uuid
+  employee     Employee   @relation("TaskOwner", fields: [employeeId], references: [id], onDelete: Cascade)
+  /// The manager who put this on a direct report's list; NULL for a person's own task (ADR-0032).
+  assignedById String?    @map("assigned_by") @db.Uuid
+  assignedBy   Employee?  @relation("TaskAssigner", fields: [assignedById], references: [id], onDelete: SetNull)
+  title        String
+  status       TaskStatus @default(todo)
+  dueDate      DateTime?  @map("due_date") @db.Date
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([employeeId])
+  @@index([assignedById])
   @@map("tasks")
 }

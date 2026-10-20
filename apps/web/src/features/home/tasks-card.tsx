@@ -15,7 +15,8 @@ export type TaskView = 'mine' | 'team';
 
 /**
  * "My tasks" is the person's own list. "Team tasks" appends each direct report's list under
- * it, so a manager sees what the whole team is working on in one place.
+ * it, so a manager sees what the whole team is working on in one place, and can give any of
+ * them a new task (ADR-0032).
  */
 export function TasksCard({
   self,
@@ -34,7 +35,8 @@ export function TasksCard({
   view: TaskView;
   onViewChange: (view: TaskView) => void;
   onToggle?: (task: Task, done: boolean) => void;
-  onAdd: (title: string) => Promise<unknown>;
+  /** Adds to the signed-in person's list, or to a direct report's when `employeeId` is set. */
+  onAdd: (title: string, employeeId?: string) => Promise<unknown>;
 }) {
   const tasksFor = (id: string) => tasks.filter((t) => t.employeeId === id);
   const openCount = (id: string) => tasksFor(id).filter((t) => t.status !== 'done').length;
@@ -49,7 +51,7 @@ export function TasksCard({
             <CardDescription>
               {view === 'mine'
                 ? 'Your own tasks. Tick one off when it is done.'
-                : `Your tasks plus those of your ${reports.length} direct report${reports.length === 1 ? '' : 's'}.`}
+                : `Your tasks plus those of your ${reports.length} direct report${reports.length === 1 ? '' : 's'}. You can give any of them a task.`}
             </CardDescription>
           </div>
           <TabsList>
@@ -64,9 +66,10 @@ export function TasksCard({
 
         <CardContent>
           <TabsContent value="mine" className="grid gap-3">
-            <AddTaskRow onAdd={onAdd} />
+            <AddTaskRow onAdd={(title) => onAdd(title)} />
             <TaskList
               tasks={tasksFor(self.id)}
+              selfId={self.id}
               onToggle={onToggle}
               emptyMessage={loading ? 'Loading tasks…' : 'You have no tasks. Add one above.'}
             />
@@ -74,12 +77,18 @@ export function TasksCard({
 
           <TabsContent value="team" className="grid gap-5">
             <PersonSection employee={self} label="You">
-              <TaskList tasks={tasksFor(self.id)} onToggle={onToggle} />
+              <TaskList tasks={tasksFor(self.id)} selfId={self.id} onToggle={onToggle} />
             </PersonSection>
             {reports.map((r) => (
               <PersonSection key={r.id} employee={r}>
+                <AddTaskRow
+                  onAdd={(title) => onAdd(title, r.id)}
+                  placeholder={`Give ${r.firstName} a task`}
+                  label={`New task for ${fullName(r)}`}
+                />
                 <TaskList
                   tasks={tasksFor(r.id)}
+                  selfId={self.id}
                   readOnly
                   emptyMessage={`${r.firstName} has no tasks.`}
                 />
@@ -113,8 +122,16 @@ function PersonSection({
   );
 }
 
-/** A new task for the signed-in person, added to the top of their list. */
-function AddTaskRow({ onAdd }: { onAdd: (title: string) => Promise<unknown> }) {
+/** A new task, for the signed-in person or for one of their direct reports. */
+function AddTaskRow({
+  onAdd,
+  placeholder = 'Add a task, e.g. Review Q4 budget',
+  label = 'New task',
+}: {
+  onAdd: (title: string) => Promise<unknown>;
+  placeholder?: string;
+  label?: string;
+}) {
   const [title, setTitle] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -139,8 +156,8 @@ function AddTaskRow({ onAdd }: { onAdd: (title: string) => Promise<unknown> }) {
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         maxLength={200}
-        placeholder="Add a task, e.g. Review Q4 budget"
-        aria-label="New task"
+        placeholder={placeholder}
+        aria-label={label}
       />
       <Button type="submit" variant="secondary" disabled={saving || !title.trim()}>
         <Plus /> Add

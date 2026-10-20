@@ -1,22 +1,25 @@
 import { CircleDot } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { formatDate } from '@/features/employees/format';
+import { formatDate, fullName } from '@/features/employees/format';
 import type { Task } from '@/features/employees/types';
 import { cn } from '@/lib/utils';
 import { isOverdue, sortTasks } from './tasks';
 
 /**
  * A person's tasks. `readOnly` is for viewing someone else's list: the status shows, but
- * only the owner ticks items off.
+ * only the owner ticks items off. Tasks a manager assigned say who from; `selfId` turns the
+ * signed-in person's own name into "you".
  */
 export function TaskList({
   tasks,
+  selfId,
   readOnly = false,
   onToggle,
   emptyMessage = 'Nothing on the list.',
 }: {
   tasks: Task[];
+  selfId?: string;
   readOnly?: boolean;
   onToggle?: (task: Task, done: boolean) => void;
   emptyMessage?: string;
@@ -27,7 +30,13 @@ export function TaskList({
   return (
     <ul className="grid">
       {sortTasks(tasks).map((task) => (
-        <TaskItem key={task.id} task={task} readOnly={readOnly} onToggle={onToggle} />
+        <TaskItem
+          key={task.id}
+          task={task}
+          selfId={selfId}
+          readOnly={readOnly}
+          onToggle={onToggle}
+        />
       ))}
     </ul>
   );
@@ -35,10 +44,12 @@ export function TaskList({
 
 function TaskItem({
   task,
+  selfId,
   readOnly,
   onToggle,
 }: {
   task: Task;
+  selfId?: string;
   readOnly: boolean;
   onToggle?: (task: Task, done: boolean) => void;
 }) {
@@ -73,6 +84,11 @@ function TaskItem({
           >
             {overdue ? 'Overdue · ' : done ? 'Was due ' : 'Due '}
             {formatDate(task.dueDate)}
+          </span>
+        )}
+        {task.assignedBy && (
+          <span className="text-xs text-muted-foreground">
+            From {task.assignedBy.id === selfId ? 'you' : fullName(task.assignedBy)}
           </span>
         )}
       </label>

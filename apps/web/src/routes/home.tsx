@@ -97,7 +97,7 @@ export function HomeRoute() {
                 { onError: (error) => toast.error(errorMessage(error)) },
               )
             }
-            onAdd={(title) => createTask.mutateAsync({ title })}
+            onAdd={(title, employeeId) => createTask.mutateAsync({ title, employeeId })}
           />
         )}
       </div>

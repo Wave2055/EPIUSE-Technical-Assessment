@@ -4,6 +4,8 @@ import {
   createFilteredRowModel,
   createSortedRowModel,
   filterFn_equalsString,
+  filterFn_inDateRange,
+  filterFn_inNumberRange,
   filterFn_includesString,
   globalFilteringFeature,
   rowSortingFeature,
@@ -18,6 +20,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Banknote,
+  CalendarRange,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -38,6 +42,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -69,11 +75,19 @@ const features = tableFeatures({
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),
   sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text, basic: sortFn_basic },
-  filterFns: { includesString: filterFn_includesString, equalsString: filterFn_equalsString },
+  filterFns: {
+    includesString: filterFn_includesString,
+    equalsString: filterFn_equalsString,
+    inDateRange: filterFn_inDateRange,
+    inNumberRange: filterFn_inNumberRange,
+  },
   columnMeta: {} as { align?: 'left' | 'right' },
 });
 
 type Row = Employee & { name: string; managerName: string };
+
+/** A range filter's value: `[from, to]` as typed, either end blank for open-ended. */
+type Range = [string, string];
 
 const ALL = 'all';
 const col = createColumnHelper<typeof features, Row>();
@@ -97,7 +111,7 @@ export function EmployeesRoute() {
   return <EmployeesTable employees={employeesQuery.data} />;
 }
 
-function EmployeesTable({ employees }: { employees: Employee[] }) {
+export function EmployeesTable({ employees }: { employees: Employee[] }) {
   const isAdmin = useIsAdmin();
   const [editing, setEditing] = useState<Employee | null | undefined>(undefined);
   const [deleting, setDeleting] = useState<Employee | null>(null);
@@ -157,12 +171,15 @@ function EmployeesTable({ employees }: { employees: Employee[] }) {
         col.accessor('birthDate', {
           header: 'Birth date',
           sortFn: 'alphanumeric',
+          filterFn: 'inDateRange',
           cell: (info) => formatDate(info.getValue()),
         }),
         col.accessor('salary', {
           header: 'Salary',
           sortFn: 'basic',
           enableSorting: isAdmin,
+          enableColumnFilter: isAdmin,
+          filterFn: 'inNumberRange',
           enableGlobalFilter: false,
           meta: { align: 'right' },
           cell: (info) => (
@@ -218,7 +235,7 @@ function EmployeesTable({ employees }: { employees: Employee[] }) {
   const globalFilter = (table.state.globalFilter as string | undefined) ?? '';
   const positionFilter = (table.getColumn('position')?.getFilterValue() as string) ?? ALL;
   const managerFilter = (table.getColumn('managerName')?.getFilterValue() as string) ?? ALL;
-  const filtered = globalFilter !== '' || positionFilter !== ALL || managerFilter !== ALL;
+  const filtered = globalFilter !== '' || table.state.columnFilters.length > 0;
   const rows = table.getRowModel().rows;
 
   return (
@@ -286,6 +303,22 @@ function EmployeesTable({ employees }: { employees: Employee[] }) {
             ))}
           </SelectContent>
         </Select>
+        <RangeFilter
+          column={table.getColumn('birthDate')}
+          label="Birth date"
+          icon={CalendarRange}
+          type="date"
+          format={formatDate}
+        />
+        {isAdmin && (
+          <RangeFilter
+            column={table.getColumn('salary')}
+            label="Salary"
+            icon={Banknote}
+            type="number"
+            format={(v) => formatSalary(Number(v))}
+          />
+        )}
         {filtered && (
           <Button
             variant="ghost"
@@ -387,5 +420,74 @@ function SortButton({
       {children}
       <Icon className={cn('size-3.5', !sorted && 'opacity-40')} />
     </button>
+  );
+}
+
+/**
+ * A from/to filter in a popover, for the columns a dropdown cannot cover: birth date and
+ * salary. Either end may be left blank; TanStack's `inDateRange` and `inNumberRange` treat
+ * a blank end as open and drop the filter once both are blank.
+ */
+function RangeFilter({
+  column,
+  label,
+  icon: Icon,
+  type,
+  format,
+}: {
+  column: Column<typeof features, Row> | undefined;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  type: 'date' | 'number';
+  format: (value: string) => string;
+}) {
+  if (!column) return null;
+  const [from, to] = (column.getFilterValue() as Range | undefined) ?? ['', ''];
+  const set = (next: Range) =>
+    column.setFilterValue(next[0] === '' && next[1] === '' ? undefined : next);
+
+  const summary =
+    from && to
+      ? `${format(from)} – ${format(to)}`
+      : from
+        ? `From ${format(from)}`
+        : to
+          ? `Up to ${format(to)}`
+          : label;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          aria-label={`Filter by ${label.toLowerCase()}`}
+          className={cn((from || to) && 'border-primary/50')}
+        >
+          <Icon className="size-4" /> {summary}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid gap-3">
+        <div className="grid gap-1.5">
+          <Label htmlFor={`${column.id}-from`}>{label} from</Label>
+          <Input
+            id={`${column.id}-from`}
+            type={type}
+            min={type === 'number' ? 0 : undefined}
+            value={from}
+            onChange={(e) => set([e.target.value, to])}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor={`${column.id}-to`}>{label} to</Label>
+          <Input
+            id={`${column.id}-to`}
+            type={type}
+            min={type === 'number' ? 0 : undefined}
+            value={to}
+            onChange={(e) => set([from, e.target.value])}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

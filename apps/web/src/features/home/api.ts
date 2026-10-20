@@ -21,7 +21,8 @@ export const useTeamTasks = (enabled: boolean) =>
 export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Pick<CreateTaskInput, 'title'>) =>
+    /** `employeeId` assigns it to one of the caller's direct reports (ADR-0032). */
+    mutationFn: (input: Pick<CreateTaskInput, 'title' | 'employeeId'>) =>
       apiFetch<Task>('/me/tasks', { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: taskKeys.team }),
   });

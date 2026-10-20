@@ -244,6 +244,81 @@ describe('HTTP API', () => {
         .expect(200);
     });
 
+    it('lets a manager assign a task to a direct report, and manage it while they report to them', async () => {
+      const boss = await insertEmployee(t.prisma, { firstName: 'Busi', lastName: 'Boss' });
+      const report = await insertEmployee(t.prisma, { managerId: boss.id });
+      const bossToken = (
+        await signIn(t.http, (await insertUser(t.prisma, 'VIEWER', boss.id)).email)
+      ).token;
+      const reportToken = (
+        await signIn(t.http, (await insertUser(t.prisma, 'VIEWER', report.id)).email)
+      ).token;
+
+      const assigned = await t.http
+        .post('/api/me/tasks')
+        .set(auth(bossToken))
+        .send({ title: 'Draft the Q1 plan', employeeId: report.id })
+        .expect(201);
+      expect(assigned.body).toMatchObject({
+        employeeId: report.id,
+        assignedBy: { id: boss.id, firstName: 'Busi', lastName: 'Boss' },
+      });
+
+      const own = await t.http.get('/api/me/tasks').set(auth(reportToken)).expect(200);
+      expect(own.body.groups[0].tasks[0]).toMatchObject({
+        title: 'Draft the Q1 plan',
+        assignedBy: { id: boss.id },
+      });
+
+      await t.http
+        .patch(`/api/me/tasks/${assigned.body.id}`)
+        .set(auth(bossToken))
+        .send({ dueDate: '2026-12-01' })
+        .expect(200);
+
+      // Once the report moves to another manager, the old one loses the task.
+      const other = await insertEmployee(t.prisma);
+      await t.prisma.employee.update({ where: { id: report.id }, data: { managerId: other.id } });
+      await t.http
+        .patch(`/api/me/tasks/${assigned.body.id}`)
+        .set(auth(bossToken))
+        .send({ status: 'done' })
+        .expect(404);
+
+      // The owner keeps full control of their own list.
+      await t.http.delete(`/api/me/tasks/${assigned.body.id}`).set(auth(reportToken)).expect(204);
+    });
+
+    it('refuses to assign a task to anyone but a direct report', async () => {
+      const boss = await insertEmployee(t.prisma);
+      const report = await insertEmployee(t.prisma, { managerId: boss.id });
+      const skipLevel = await insertEmployee(t.prisma, { managerId: report.id });
+      const { token } = await signIn(t.http, (await insertUser(t.prisma, 'ADMIN', boss.id)).email);
+
+      for (const target of [skipLevel.id, (await insertEmployee(t.prisma)).id]) {
+        const res = await t.http
+          .post('/api/me/tasks')
+          .set(auth(token))
+          .send({ title: 'Not yours to give', employeeId: target })
+          .expect(403);
+        expect(res.body.code).toBe('FORBIDDEN');
+      }
+      expect(await t.prisma.task.count({ where: { title: 'Not yours to give' } })).toBe(0);
+    });
+
+    it("does not let a report edit a task on their manager's list", async () => {
+      const boss = await insertEmployee(t.prisma);
+      const report = await insertEmployee(t.prisma, { managerId: boss.id });
+      const task = await t.prisma.task.create({
+        data: { employeeId: boss.id, title: 'Boss only' },
+      });
+      const { token } = await signIn(
+        t.http,
+        (await insertUser(t.prisma, 'VIEWER', report.id)).email,
+      );
+      await t.http.delete(`/api/me/tasks/${task.id}`).set(auth(token)).expect(404);
+    });
+
     it("hides someone else's task behind a 404", async () => {
       const owner = await insertEmployee(t.prisma);
       const task = await t.prisma.task.create({ data: { employeeId: owner.id, title: 'Private' } });
