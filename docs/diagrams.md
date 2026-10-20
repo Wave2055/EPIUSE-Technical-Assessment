@@ -12,6 +12,7 @@ The system drawn from six angles. Each diagram is [Mermaid](https://mermaid.js.o
 8. [Avatar resolution](#8-avatar-resolution)
 9. [Delivery pipeline](#9-delivery-pipeline)
 10. [Test layers](#10-test-layers)
+11. [A login's life](#11-a-logins-life)
 
 ## 1. System context
 
@@ -108,12 +109,13 @@ Dotted lines are relationships with no foreign key: the audit trail must outlive
 ```mermaid
 erDiagram
   employees ||--o{ employees : "manages (manager_id)"
-  employees ||--o| users : "is signed in as"
+  employees ||--|| users : "signs in as"
   employees ||--o{ tasks : "owns"
   employees ||--o{ tasks : "assigned (assigned_by)"
   employees ||..o{ employee_audit : "history of (no FK)"
   users ||--o{ refresh_tokens : "sessions"
   users ||..o{ employee_audit : "changed by (no FK)"
+  users ||..o{ user_audit : "history of (no FK)"
 
   employees {
     uuid id PK
@@ -130,9 +132,20 @@ erDiagram
   users {
     uuid id PK
     citext email UK
-    text password_hash "argon2id"
+    text password_hash "argon2id; null until issued"
     enum role "ADMIN or VIEWER"
-    uuid employee_id FK, UK "optional link"
+    uuid employee_id FK, UK "required, cascade"
+    bool must_change_password "one-time password in force"
+    timestamptz deactivated_at
+    timestamptz last_login_at
+  }
+  user_audit {
+    bigint id PK
+    uuid user_id "kept after a delete"
+    citext email
+    text action "CREATE, ROLE_CHANGE, DEACTIVATE, ..."
+    uuid changed_by "user id; null = system"
+    jsonb details "never a password"
   }
   refresh_tokens {
     uuid id PK
@@ -189,6 +202,7 @@ sequenceDiagram
   A-->>W: 200
 
   Note over A,D: A replayed (already rotated) cookie revokes the whole family
+  Note over A,D: Every request: the guard reads the login, so role, deactivation<br/>and a one-time password apply at once (ADR-0036)
 ```
 
 ## 6. Changing a reporting line
@@ -290,3 +304,35 @@ flowchart TB
 ```
 
 See [ADR-0020](adr/0020-test-database-triggers-with-testcontainers.md) and [ADR-0035](adr/0035-end-to-end-tests-on-a-full-docker-build.md).
+
+## 11. A login's life
+
+Every employee has one login ([ADR-0036](adr/0036-every-employee-has-a-login-managed-by-admins.md)). The admin moves it between states; the person moves it only by choosing their own password. Every transition is written to `user_audit`.
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> OneTimePassword: admin adds the employee
+  [*] --> NoPassword: existing employee, at migration
+  NoPassword --> OneTimePassword: admin issues a password
+  OneTimePassword --> Active: person chooses their own
+  Active --> OneTimePassword: admin resets the password
+  Active --> Active: person changes their password
+  NoPassword --> Deactivated: admin deactivates
+  OneTimePassword --> Deactivated: admin deactivates
+  Active --> Deactivated: admin deactivates
+  Deactivated --> Active: admin reactivates (password unchanged)
+  Active --> [*]: employee deleted
+  Deactivated --> [*]: employee deleted
+
+  note right of OneTimePassword
+    Can only change the password
+    or sign out
+  end note
+  note right of Deactivated
+    Signed out at once;
+    sign-in refused
+  end note
+```
+
+Role is separate from these states: an admin can make any login an admin or a regular user, except their own, and never the last active admin.

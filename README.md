@@ -4,7 +4,7 @@ A cloud-hosted employee hierarchy manager, built for the EPI-USE technical asses
 
 **Live:** https://d1qxvq2ahpxf8h.cloudfront.net
 
-Sign-in details are shared separately. The two seeded accounts are `admin@example.com` (full access) and `viewer@example.com` (read-only, salaries hidden).
+Sign-in details are shared separately. The two seeded accounts with passwords are `admin@example.com` (full access) and `viewer@example.com` (read-only, salaries hidden). Every other employee has a login too; an admin issues its one-time password from the **Users** page ([ADR-0036](docs/adr/0036-every-employee-has-a-login-managed-by-admins.md)).
 
 ![The org chart](docs/images/org-chart-details.png)
 

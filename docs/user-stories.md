@@ -75,7 +75,7 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 ### Access, privacy and accountability _(beyond the brief)_
 
-**US-12 — Sign in.** As a user, I want to sign in once and stay signed in while I work, so that the application is not open to anyone who finds the URL.
+**US-12 — Sign in.** As a user, I want to sign in once and stay signed in while I work, so that the application is not open to anyone who finds the URL. There is no public sign-up: access is given by an admin (US-18).
 
 - Sessions renew in the background and survive a page reload ([ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md), [ADR-0030](adr/0030-web-session-renewal.md)).
 - Password guessing is limited to 10 attempts per 15 minutes per address ([ADR-0025](adr/0025-rate-limit-by-client-address.md)).
@@ -98,6 +98,29 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 - The team view has an add row under each direct report. Only direct reports can be given tasks, and the API refuses anyone else.
 - I can change or delete a task I assigned while that person still reports to me.
+
+### Accounts _(beyond the brief)_
+
+**US-18 — Give a new colleague access.** As an HR administrator, I want adding an employee to give them a login, so that everyone I add can sign in without anyone touching the server ([ADR-0036](adr/0036-every-employee-has-a-login-managed-by-admins.md)).
+
+- The new login is a regular user, signing in with the employee's email.
+- I see a one-time password once, to pass on privately; nobody can see it again.
+
+**US-19 — Choose my own password.** As a new user, I want to replace the password I was given with my own, so that only I know it.
+
+- Signing in with a one-time password takes me straight to choosing my own; nothing else works until I do.
+- I can change my password at any time from the account menu.
+
+**US-20 — Make someone an admin, or take it away.** As an HR administrator, I want to promote a regular user to admin and back, so that I can share or hand over administration.
+
+- It takes effect on their next click; demotion also signs them out.
+- I cannot change my own access, and the last admin can never be removed, so the system is never left without one.
+
+**US-21 — Stop someone signing in.** As an HR administrator, I want to deactivate a login without deleting the person, so that a leaver loses access at once but their record and history stay.
+
+**US-22 — Help someone who forgot their password.** As an HR administrator, I want to reset a password, so that the person can get back in; the old password and their sessions stop working.
+
+**US-23 — See who changed access.** As an HR administrator, I want every account change in the audit trail, so that promotions, deactivations and resets are accountable.
 
 ### Delivery
 
@@ -123,4 +146,4 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 | Avatar upload _(optional)_                                               | US-11 (API only)                                         |
 | Deployed to the cloud at a URL                                           | US-17                                                    |
 | No mocked data; changes stored in a remote database                      | US-17                                                    |
-| Additional features                                                      | US-12 to US-16                                           |
+| Additional features                                                      | US-12 to US-16, US-18 to US-23                           |
