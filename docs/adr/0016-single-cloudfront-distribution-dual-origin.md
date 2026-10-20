@@ -1,6 +1,6 @@
 # ADR-0016: Serve the SPA and the API from one CloudFront distribution
 
-- **Status:** Accepted
+- **Status:** Accepted; the 403/404 → `/index.html` rule superseded by [ADR-0027](0027-spa-routing-with-a-cloudfront-function.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0002](0002-separate-api-and-web-deployables.md), [ADR-0005](0005-react-vite-spa-for-the-web-client.md), [ADR-0015](0015-ec2-docker-for-api-compute.md)

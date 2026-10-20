@@ -1,6 +1,6 @@
 # ADR-0019: Deploy from GitHub Actions using OIDC role assumption
 
-- **Status:** Accepted
+- **Status:** Accepted; release mechanics refined by [ADR-0026](0026-self-migrating-api-image-released-by-tag.md), trust policy amended by [ADR-0029](0029-trust-githubs-immutable-oidc-subject.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0015](0015-ec2-docker-for-api-compute.md), [ADR-0016](0016-single-cloudfront-distribution-dual-origin.md), [ADR-0018](0018-terraform-for-infrastructure.md)

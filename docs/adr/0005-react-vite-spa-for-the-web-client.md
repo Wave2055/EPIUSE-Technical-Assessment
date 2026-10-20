@@ -1,6 +1,6 @@
 # ADR-0005: React + Vite SPA for the web client
 
-- **Status:** Accepted
+- **Status:** Accepted; SPA deep-link routing by a CloudFront Function per [ADR-0027](0027-spa-routing-with-a-cloudfront-function.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0002](0002-separate-api-and-web-deployables.md), [ADR-0016](0016-single-cloudfront-distribution-dual-origin.md)
