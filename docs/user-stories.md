@@ -71,7 +71,7 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 **US-11 — Upload a photo.** _(Optional in the brief.)_ As an HR administrator, I want to upload a photo for an employee who has no Gravatar, so that everyone has a recognisable picture.
 
-- PNG, JPEG or WebP up to 2 MB, sent straight from the browser to S3. An uploaded photo takes priority over Gravatar, and removing it falls back to Gravatar, then initials.
+- **Partly built: the API supports it, the web app has no upload screen yet.** The API issues a presigned upload for a PNG, JPEG or WebP of up to 2 MB, sent straight to S3. An uploaded photo takes priority over Gravatar, and removing it falls back to Gravatar, then initials.
 
 ### Access, privacy and accountability _(beyond the brief)_
 
@@ -120,7 +120,7 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 | Search the hierarchy to find, edit or delete                             | US-08                                                    |
 | Table sortable and filterable on any field                               | US-09 (birth date and salary sort but do not yet filter) |
 | Gravatar integration                                                     | US-10                                                    |
-| Avatar upload _(optional)_                                               | US-11                                                    |
+| Avatar upload _(optional)_                                               | US-11 (API only)                                         |
 | Deployed to the cloud at a URL                                           | US-17                                                    |
 | No mocked data; changes stored in a remote database                      | US-17                                                    |
 | Additional features                                                      | US-12 to US-16                                           |
