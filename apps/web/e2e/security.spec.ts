@@ -123,8 +123,10 @@ test.describe('the public surface', () => {
       '/api/employees',
       '/api/hierarchy',
       '/api/audit',
+      '/api/audit/accounts',
       '/api/me',
       '/api/me/tasks',
+      '/api/users',
     ]) {
       const res = await request.get(path);
       expect(res.status(), path).toBe(401);
