@@ -1,6 +1,6 @@
 # ADR-0027: Route the SPA with a CloudFront Function
 
-- **Status:** Accepted
+- **Status:** Accepted; response headers and dot-path 404s per [ADR-0034](0034-harden-the-public-web-surface.md)
 - **Date:** 2026-10-19
 - **Deciders:** Jaitin
 - **Related:** supersedes the SPA-routing rule of [ADR-0016](0016-single-cloudfront-distribution-dual-origin.md) and the related note in [ADR-0005](0005-react-vite-spa-for-the-web-client.md)
