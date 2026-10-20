@@ -1,6 +1,6 @@
 # ADR-0020: Test against real PostgreSQL via Testcontainers
 
-- **Status:** Accepted
+- **Status:** Accepted; the E2E layer extended to a full Docker build and every user-facing rule per [ADR-0035](0035-end-to-end-tests-on-a-full-docker-build.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0008](0008-defence-in-depth-cycle-prevention.md), [ADR-0010](0010-explicit-deletion-strategies.md), [ADR-0011](0011-audit-trail-via-database-triggers.md)

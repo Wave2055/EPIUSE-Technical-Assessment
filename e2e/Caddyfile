@@ -1,0 +1,50 @@
+# Stands in for CloudFront in the end-to-end stack, so the browser tests exercise the same
+# request path as production:
+#
+#   /api/*  → the API, adding the origin secret and the viewer's address (ADR-0016, ADR-0025)
+#   /.x/…   → 404, as the routing function answers (ADR-0034)
+#   /path   → index.html for client-side routes (ADR-0027)
+#   /a.js   → the built file, or 404
+#
+# with the response headers policy from infra/modules/cdn/main.tf. The CSP below must
+# match that policy; security.spec.ts compares the two. It leaves out
+# upgrade-insecure-requests, which would send the browser to https://localhost.
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	handle /api/* {
+		reverse_proxy api:3000 {
+			header_up x-origin-secret {env.ORIGIN_SECRET}
+			# CloudFront sets this to the viewer's ip:port. Tests send X-E2E-Client so each
+			# gets its own rate-limit bucket, as separate viewers would.
+			header_up CloudFront-Viewer-Address {http.request.header.X-E2E-Client}
+		}
+	}
+
+	handle {
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://gravatar.com; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			Strict-Transport-Security "max-age=63072000; includeSubDomains"
+			X-Frame-Options "DENY"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+			-Server
+		}
+
+		# `route` keeps this order; Caddy would otherwise rewrite before responding.
+		route {
+			@dotPath path_regexp (^|/)\.
+			respond @dotPath 404
+
+			@appRoute not path_regexp \.[^/]*$
+			rewrite @appRoute /index.html
+
+			root * /srv
+			file_server
+		}
+	}
+}

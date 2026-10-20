@@ -23,8 +23,10 @@ export interface TestApp {
 /**
  * A real PostgreSQL in a container, migrated exactly as production is (ADR-0020), behind
  * the full Nest app with the same global prefix, guards, filter and interceptors.
+ *
+ * `env` overrides or adds settings, e.g. ORIGIN_SECRET to exercise the origin check.
  */
-export async function startTestApp(): Promise<TestApp> {
+export async function startTestApp(env: Record<string, string> = {}): Promise<TestApp> {
   const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(
     'postgres:17-alpine',
   ).start();
@@ -44,6 +46,8 @@ export async function startTestApp(): Promise<TestApp> {
   });
   delete process.env.ORIGIN_SECRET;
   delete process.env.AVATAR_BUCKET;
+  delete process.env.API_DOCS;
+  Object.assign(process.env, env);
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication({ logger: false });

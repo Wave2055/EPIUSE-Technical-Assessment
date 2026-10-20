@@ -1,0 +1,25 @@
+# Build context for e2e/edge.Dockerfile (BuildKit reads this file in place of the root
+# .dockerignore, which leaves the web sources out of the API's build context).
+
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+
+# Never send secrets into a build context (ADR-0018).
+**/.env
+**/.env.*
+!**/.env.example
+.npmrc
+
+.git
+.github
+.githooks
+docs
+infra
+deploy
+apps/api/src
+apps/api/test
+apps/api/prisma

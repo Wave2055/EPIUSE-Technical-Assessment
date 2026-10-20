@@ -17,6 +17,7 @@ export const ERROR_CODES = [
   'NOT_LINKED',
   'AVATAR_UPLOADS_DISABLED',
   'RATE_LIMITED',
+  'PAYLOAD_TOO_LARGE',
   'INTERNAL',
 ] as const;
 

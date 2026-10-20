@@ -1,6 +1,6 @@
 import { EmployeeListQuerySchema } from '@epiuse/shared';
 import { ApiError } from '../common/errors/api-error.js';
-import { buildEmployeeListArgs } from './list-query.js';
+import { buildEmployeeListArgs, escapeLike } from './list-query.js';
 
 const query = (raw: Record<string, unknown> = {}) => EmployeeListQuerySchema.parse(raw);
 
@@ -14,6 +14,11 @@ describe('buildEmployeeListArgs', () => {
   it('requires every search word to match some field', () => {
     const args = buildEmployeeListArgs(query({ q: 'thandi  nkosi' }), 'ADMIN');
     expect(args.where.AND).toHaveLength(2);
+  });
+
+  it('escapes LIKE wildcards in search words, so they match literally', () => {
+    expect(escapeLike('50%_off\\')).toBe('50\\%\\_off\\\\');
+    expect(escapeLike('plain')).toBe('plain');
   });
 
   it('maps managerId "none" to a null manager', () => {

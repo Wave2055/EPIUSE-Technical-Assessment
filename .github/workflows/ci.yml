@@ -1,6 +1,7 @@
 # Continuous integration (ADR-0019): every push and pull request runs lint, typecheck,
 # unit tests, integration tests against a real PostgreSQL (ADR-0020), both builds, and a
-# boot test of the production API image.
+# boot test of the production API image, and the browser tests against the whole
+# application built and run in Docker (ADR-0035).
 #
 # Deployment on merge to main (ECR + SSM for the API, S3 + CloudFront for the SPA) is a
 # separate workflow, added once the Terraform infrastructure exists.
@@ -142,3 +143,41 @@ jobs:
 
           docker run --rm --network smoke -e DATABASE_URL \
             -e SEED_ADMIN_PASSWORD -e SEED_VIEWER_PASSWORD epiuse-api:ci prisma db seed
+
+  e2e:
+    name: End-to-end tests (full Docker build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # Only Playwright runs on the runner; the application under test is built from source
+      # into images and run in Docker (ADR-0035).
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @epiuse/web exec playwright install --with-deps chromium
+
+      # Builds the production API image and web build, starts them on PostgreSQL behind
+      # the CloudFront stand-in, seeds, runs every spec, and tears down. Secrets are random
+      # per run.
+      - name: End-to-end tests
+        run: pnpm test:e2e:docker
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
