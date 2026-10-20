@@ -21,6 +21,9 @@ class MemoryStore extends RefreshTokenStore {
   async revokeFamily(familyId: string) {
     for (const r of this.rows) if (r.familyId === familyId) r.revokedAt ??= new Date();
   }
+  async revokeAllForUser(userId: string) {
+    for (const r of this.rows) if (r.userId === userId) r.revokedAt ??= new Date();
+  }
 }
 
 const config = AppConfig.fromEnv({
@@ -29,6 +32,12 @@ const config = AppConfig.fromEnv({
 });
 
 describe('AuthService', () => {
+  let users: {
+    id: string;
+    email: string;
+    passwordHash: string | null;
+    deactivatedAt: Date | null;
+  }[];
   let store: MemoryStore;
   let auth: AuthService;
   const jwt = new JwtService({});
@@ -38,13 +47,17 @@ describe('AuthService', () => {
       id: '0b1f8a3e-2a4f-4f58-9a0e-6c1d9a2b7c11',
       email: 'admin@example.com',
       role: 'ADMIN' as const,
-      employeeId: null,
-      passwordHash: await hashPassword('correct horse battery'),
+      employeeId: '5d1c2b3a-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      passwordHash: (await hashPassword('correct horse battery')) as string | null,
+      mustChangePassword: false,
+      deactivatedAt: null as Date | null,
     };
+    users = [user];
     const prisma = {
       user: {
         findUnique: ({ where }: { where: { email?: string; id?: string } }) =>
-          Promise.resolve(where.email === user.email || where.id === user.id ? user : null),
+          Promise.resolve(users.find((u) => u.email === where.email || u.id === where.id) ?? null),
+        update: () => Promise.resolve(user),
       },
     } as unknown as PrismaService;
     store = new MemoryStore();
@@ -63,6 +76,24 @@ describe('AuthService', () => {
     expect(store.rows).toHaveLength(1);
     // Only the hash is stored.
     expect(store.rows[0]!.tokenHash).not.toBe(session.refreshToken);
+  });
+
+  it('refuses a login that has no password yet, and a deactivated one, with the same answer', async () => {
+    const answer = {
+      code: 'UNAUTHENTICATED',
+      message: 'That email and password do not match an account.',
+    };
+    users[0]!.passwordHash = null;
+    await expect(
+      auth.login({ email: 'admin@example.com', password: 'correct horse battery' }),
+    ).rejects.toMatchObject(answer);
+
+    users[0]!.passwordHash = await hashPassword('correct horse battery');
+    users[0]!.deactivatedAt = new Date();
+    await expect(
+      auth.login({ email: 'admin@example.com', password: 'correct horse battery' }),
+    ).rejects.toMatchObject(answer);
+    expect(store.rows).toHaveLength(0);
   });
 
   it('gives the same answer for an unknown email and a wrong password', async () => {

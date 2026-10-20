@@ -25,8 +25,8 @@ export class MeService {
       email: user.email,
       role: user.role,
       employeeId: user.employeeId,
+      mustChangePassword: user.mustChangePassword,
     };
-    if (!user.employee) return { user: authUser, employee: null, manager: null, directReports: [] };
 
     const reports = await this.prisma.employee.findMany({
       where: { managerId: user.employee.id },

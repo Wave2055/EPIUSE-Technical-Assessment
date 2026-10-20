@@ -9,6 +9,6 @@ import { PrismaRefreshTokenStore, RefreshTokenStore } from './refresh-token.repo
   imports: [JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, { provide: RefreshTokenStore, useClass: PrismaRefreshTokenStore }],
-  exports: [JwtModule],
+  exports: [JwtModule, RefreshTokenStore],
 })
 export class AuthModule {}
