@@ -42,6 +42,16 @@ export const onSessionExpired = (handler: (() => void) | null): void => {
   sessionExpiredHandler = handler;
 };
 
+let passwordChangeRequiredHandler: (() => void) | null = null;
+
+/**
+ * Called when the API refuses a request until the user replaces a one-time password
+ * (ADR-0036), e.g. after an admin reset it mid-session, so the app can send them to do so.
+ */
+export const onPasswordChangeRequired = (handler: (() => void) | null): void => {
+  passwordChangeRequiredHandler = handler;
+};
+
 /**
  * Exchanges the refresh cookie for a new access token, or resolves `null` if there is no
  * valid session. Concurrent callers share one request: the API rotates the cookie on every
@@ -86,8 +96,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   let response = await send(path, init);
 
   // Access tokens are short-lived, so a 401 usually means this one expired: renew it once and
-  // retry. The auth routes are left alone, so a failed login is reported as it is.
-  if (response.status === 401 && !path.startsWith('/auth/')) {
+  // retry. The sign-in routes are left alone, so a failed login is reported as it is; a
+  // password change is an ordinary signed-in request and renews like any other.
+  const renews = !path.startsWith('/auth/') || path === '/auth/password';
+  if (response.status === 401 && renews) {
     const session = await refreshSession();
     if (session) {
       response = await send(path, init);
@@ -103,6 +115,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
+    if ((payload as { code?: string } | null)?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      passwordChangeRequiredHandler?.();
+    }
     throw new ApiRequestError(
       response.status,
       (payload as { code?: string } | null)?.code ?? 'UNKNOWN',

@@ -1,6 +1,17 @@
-import type { AccessTokenResponse, AuthUser, LoginInput } from '@epiuse/shared';
+import type {
+  AccessTokenResponse,
+  AuthUser,
+  ChangePasswordInput,
+  LoginInput,
+} from '@epiuse/shared';
 import { useSyncExternalStore } from 'react';
-import { apiFetch, onSessionExpired, refreshSession, setAccessToken } from '@/lib/api-client';
+import {
+  apiFetch,
+  onPasswordChangeRequired,
+  onSessionExpired,
+  refreshSession,
+  setAccessToken,
+} from '@/lib/api-client';
 import { queryClient } from '@/lib/query-client';
 
 /**
@@ -62,6 +73,20 @@ export async function signIn(credentials: LoginInput): Promise<AuthUser> {
   return issued.user;
 }
 
+/**
+ * Replaces the signed-in user's password (ADR-0036). The API ends every other session and
+ * returns a new one, which replaces this one; a one-time password's flag is cleared with it.
+ */
+export async function changePassword(input: ChangePasswordInput): Promise<AuthUser> {
+  const issued = await apiFetch<AccessTokenResponse>('/auth/password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  setAccessToken(issued.accessToken);
+  setSession({ status: 'signedIn', user: issued.user });
+  return issued.user;
+}
+
 export async function signOut(): Promise<void> {
   try {
     await apiFetch<void>('/auth/logout', { method: 'POST' });
@@ -78,3 +103,9 @@ function signedOut(): Session {
 }
 
 onSessionExpired(() => setSession(signedOut()));
+
+onPasswordChangeRequired(() => {
+  if (session.status === 'signedIn' && !session.user.mustChangePassword) {
+    setSession({ status: 'signedIn', user: { ...session.user, mustChangePassword: true } });
+  }
+});
