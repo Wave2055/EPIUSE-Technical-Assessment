@@ -39,6 +39,7 @@ Each record captures one decision with its context, consequences and the alterna
 | [0024](0024-deploy-to-eu-west-1.md)                         | Deploy to eu-west-1 (Ireland)                                                 | Accepted |
 | [0027](0027-spa-routing-with-a-cloudfront-function.md)      | Route the SPA with a CloudFront Function                                      | Accepted |
 | [0028](0028-lock-terraform-state-with-s3.md)                | Lock Terraform state with S3's native lock file                               | Accepted |
+| [0034](0034-harden-the-public-web-surface.md)               | Harden the public web surface                                                 | Accepted |
 | **Delivery**                                                |                                                                               |          |
 | [0019](0019-github-actions-oidc-cicd.md)                    | Deploy from GitHub Actions using OIDC role assumption                         | Accepted |
 | [0020](0020-test-database-triggers-with-testcontainers.md)  | Test against real PostgreSQL via Testcontainers                               | Accepted |
