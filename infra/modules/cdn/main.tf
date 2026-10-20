@@ -16,8 +16,61 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_and_cloudfront" {
   name = "Managed-AllViewerAndCloudFrontHeaders-2022-06"
 }
 
-data "aws_cloudfront_response_headers_policy" "security" {
-  name = "Managed-SecurityHeadersPolicy"
+# The managed SecurityHeadersPolicy sends no Content-Security-Policy, so the SPA had none
+# (ADR-0034). The app loads only its own scripts and styles, avatars from itself and
+# Gravatar, and talks only to /api, plus presigned uploads straight to the avatar bucket.
+# React, Radix and React Flow set inline style attributes, hence 'unsafe-inline' for
+# styles only; scripts stay 'self'.
+locals {
+  content_security_policy = join("; ", [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://gravatar.com",
+    "font-src 'self' data:",
+    "connect-src 'self' https://${var.avatars_bucket.regional_domain}",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ])
+}
+
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name    = "${var.name}-security-headers"
+  comment = "CSP plus the usual hardening headers for the SPA and avatars"
+
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = local.content_security_policy
+      override                = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 63072000
+      include_subdomains         = true
+      override                   = true
+    }
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      value    = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+      override = true
+    }
+  }
 }
 
 resource "aws_cloudfront_origin_access_control" "s3" {
@@ -92,7 +145,7 @@ resource "aws_cloudfront_distribution" "this" {
     cached_methods             = ["GET", "HEAD"]
     compress                   = true
     cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
-    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
 
     function_association {
       event_type   = "viewer-request"
@@ -113,13 +166,14 @@ resource "aws_cloudfront_distribution" "this" {
 
   # Avatar keys include a random part per upload, so they cache safely (ADR-0013).
   ordered_cache_behavior {
-    path_pattern           = "/avatars/*"
-    target_origin_id       = local.avatars_origin
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    compress               = true
-    cache_policy_id        = data.aws_cloudfront_cache_policy.optimized.id
+    path_pattern               = "/avatars/*"
+    target_origin_id           = local.avatars_origin
+    viewer_protocol_policy     = "redirect-to-https"
+    allowed_methods            = ["GET", "HEAD"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
   restrictions {
