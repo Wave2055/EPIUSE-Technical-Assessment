@@ -30,7 +30,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // No source maps in the published build: anything in dist is public, and a map hands out
+    // the full original source (ADR-0034).
+    sourcemap: false,
     rollupOptions: {
       output: {
         /**
