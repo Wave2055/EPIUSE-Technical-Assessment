@@ -60,8 +60,8 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 - Every column sorts: name, employee number, role, manager, birth date and salary.
 - A search box matches name, employee number, email and role, and dropdowns filter by role and by manager.
+- Birth date and salary filter by a from/to range, with either end left open. Salary sorting and filtering are offered to administrators only.
 - Sorting and filtering happen in the browser, so they respond instantly ([ADR-0005](adr/0005-react-vite-spa-for-the-web-client.md)).
-- **Gap:** birth date and salary can be sorted but have no filter control of their own yet.
 
 ### Avatars
 
@@ -103,18 +103,18 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 ## Coverage of the brief
 
-| Brief requirement                                                        | Stories                                                  |
-| ------------------------------------------------------------------------ | -------------------------------------------------------- |
-| Create, read, update and delete employees                                | US-01, US-02, US-03                                      |
-| Set a reporting line manager                                             | US-04                                                    |
-| No one may be their own manager                                          | US-05                                                    |
-| Employees with no manager (e.g. the CEO)                                 | US-06                                                    |
-| Minimum fields: name, surname, birth date, number, salary, role, manager | US-01                                                    |
-| Visual hierarchy (tree or graph)                                         | US-07                                                    |
-| Search the hierarchy to find, edit or delete                             | US-08                                                    |
-| Table sortable and filterable on any field                               | US-09 (birth date and salary sort but do not yet filter) |
-| Gravatar integration                                                     | US-10                                                    |
-| Avatar upload _(optional)_                                               | US-11                                                    |
-| Deployed to the cloud at a URL                                           | US-16                                                    |
-| No mocked data; changes stored in a remote database                      | US-16                                                    |
-| Additional features                                                      | US-12 to US-15                                           |
+| Brief requirement                                                        | Stories             |
+| ------------------------------------------------------------------------ | ------------------- |
+| Create, read, update and delete employees                                | US-01, US-02, US-03 |
+| Set a reporting line manager                                             | US-04               |
+| No one may be their own manager                                          | US-05               |
+| Employees with no manager (e.g. the CEO)                                 | US-06               |
+| Minimum fields: name, surname, birth date, number, salary, role, manager | US-01               |
+| Visual hierarchy (tree or graph)                                         | US-07               |
+| Search the hierarchy to find, edit or delete                             | US-08               |
+| Table sortable and filterable on any field                               | US-09               |
+| Gravatar integration                                                     | US-10               |
+| Avatar upload _(optional)_                                               | US-11               |
+| Deployed to the cloud at a URL                                           | US-16               |
+| No mocked data; changes stored in a remote database                      | US-16               |
+| Additional features                                                      | US-12 to US-15      |
