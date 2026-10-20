@@ -46,6 +46,7 @@ Each record captures one decision with its context, consequences and the alterna
 | [0029](0029-trust-githubs-immutable-oidc-subject.md)        | Trust GitHub's immutable OIDC subject                                         | Accepted |
 | **Additional features**                                     |                                                                               |          |
 | [0022](0022-home-screen-tasks-and-user-employee-link.md)    | Add a personal home screen with tasks, linking logins to employees            | Accepted |
+| [0032](0032-managers-assign-tasks-to-direct-reports.md)     | Let managers assign tasks to their direct reports                             | Accepted |
 
 ## Start here
 
