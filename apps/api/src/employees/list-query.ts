@@ -5,6 +5,12 @@ import { fromIsoDate } from './employee.mapper.js';
 
 const SEARCH_FIELDS = ['firstName', 'lastName', 'email', 'employeeNumber', 'position'] as const;
 
+/**
+ * Prisma's `contains` becomes ILIKE without escaping, so `%` and `_` in a search would act
+ * as wildcards and match everyone. Escape them, and the escape character itself.
+ */
+export const escapeLike = (term: string) => term.replace(/[\\%_]/g, (c) => `\\${c}`);
+
 export interface EmployeeListArgs {
   where: Prisma.EmployeeWhereInput;
   orderBy: Prisma.EmployeeOrderByWithRelationInput[];
@@ -29,7 +35,9 @@ export function buildEmployeeListArgs(query: EmployeeListQuery, role: Role): Emp
   // Every word must match some field, so "thandi nkosi" finds Thandi Nkosi.
   for (const term of query.q?.split(/\s+/).filter(Boolean) ?? []) {
     and.push({
-      OR: SEARCH_FIELDS.map((field) => ({ [field]: { contains: term, mode: 'insensitive' } })),
+      OR: SEARCH_FIELDS.map((field) => ({
+        [field]: { contains: escapeLike(term), mode: 'insensitive' },
+      })),
     });
   }
   if (query.position) and.push({ position: { equals: query.position, mode: 'insensitive' } });
