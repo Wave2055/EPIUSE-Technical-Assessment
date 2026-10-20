@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 /**
  * Personal work items on the home screen. An additional feature beyond the brief
- * (ADR-0022): owners write their own tasks; managers can read their direct reports'.
+ * (ADR-0022): owners write their own tasks; managers read their direct reports' and can
+ * assign them new ones (ADR-0032).
  */
 export const TaskStatusSchema = z.enum(['todo', 'in_progress', 'done']);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
@@ -13,6 +14,8 @@ export const TaskSchema = z.object({
   title: z.string(),
   status: TaskStatusSchema,
   dueDate: z.iso.date().nullable(),
+  /** The manager who assigned it; `null` when the owner added it themselves (ADR-0032). */
+  assignedBy: z.object({ id: z.uuid(), firstName: z.string(), lastName: z.string() }).nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -28,6 +31,8 @@ export const CreateTaskSchema = z.object({
   title: taskFields.title,
   status: taskFields.status.default('todo'),
   dueDate: taskFields.dueDate.default(null),
+  /** Whose list it goes on: the caller's own when omitted, otherwise one of their direct reports. */
+  employeeId: z.uuid('That is not a valid employee id.').optional(),
 });
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 
