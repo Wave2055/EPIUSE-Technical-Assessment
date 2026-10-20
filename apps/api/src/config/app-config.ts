@@ -11,6 +11,8 @@ const EnvSchema = z
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
     /** Defaults to true in production; local HTTP development needs it off. */
     COOKIE_SECURE: z.stringbool().optional(),
+    /** Serve Swagger at /api/docs. Defaults to off in production, on elsewhere (ADR-0033). */
+    API_DOCS: z.stringbool().optional(),
     /** Shared header CloudFront adds to origin requests (ADR-0016). Required in production. */
     ORIGIN_SECRET: z.string().min(16).optional(),
     AWS_REGION: z.string().default('eu-west-1'),
@@ -55,5 +57,9 @@ export class AppConfig {
 
   get cookieSecure(): boolean {
     return this.env.COOKIE_SECURE ?? this.isProduction;
+  }
+
+  get apiDocsEnabled(): boolean {
+    return this.env.API_DOCS ?? !this.isProduction;
   }
 }

@@ -19,6 +19,9 @@ export function configureApp(app: INestApplication): void {
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cookieParser());
 
+  // The docs map every route and payload, so the public deployment does not serve them
+  // unless API_DOCS opts in (ADR-0033).
+  if (!config.apiDocsEnabled) return;
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()

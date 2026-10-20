@@ -26,4 +26,15 @@ describe('AppConfig', () => {
     });
     expect(config.cookieSecure).toBe(true);
   });
+
+  it('serves the API docs outside production, and only on request in production', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      ORIGIN_SECRET: 'a-long-enough-origin-secret',
+    };
+    expect(AppConfig.fromEnv({ ...base, NODE_ENV: 'development' }).apiDocsEnabled).toBe(true);
+    expect(AppConfig.fromEnv(production).apiDocsEnabled).toBe(false);
+    expect(AppConfig.fromEnv({ ...production, API_DOCS: 'true' }).apiDocsEnabled).toBe(true);
+  });
 });
