@@ -52,12 +52,12 @@ The web dev server forwards `/api` to the local API, just as CloudFront does in 
 ```bash
 pnpm test:unit          # shared, API and web unit tests
 pnpm test:integration   # API against a throwaway PostgreSQL in Docker (Testcontainers)
-E2E_ADMIN_PASSWORD=<seeded admin password> pnpm test:e2e
-                        # sign in → create → re-parent → search → delete → audit, in a browser
-                        # (needs the API running and seeded)
+pnpm test:e2e:docker    # builds the whole app in Docker and runs every browser test against it
 ```
 
-CI runs secret scanning, formatting, lint, typecheck, unit and integration tests, both builds, and a boot test of the production API image on every push and pull request.
+`test:e2e:docker` needs only Docker and Playwright's Chromium (`pnpm --filter @epiuse/web exec playwright install chromium`). It builds the production API image and web build, runs them on PostgreSQL behind a stand-in for CloudFront, seeds the database, runs the Playwright suite, and removes everything afterwards ([ADR-0035](docs/adr/0035-end-to-end-tests-on-a-full-docker-build.md)). Pass Playwright options after it, e.g. `pnpm test:e2e:docker --grep viewer`.
+
+CI runs secret scanning, formatting, lint, typecheck, unit and integration tests, both builds, a boot test of the production API image, and the Docker end-to-end suite on every push and pull request.
 
 ## Deploying
 

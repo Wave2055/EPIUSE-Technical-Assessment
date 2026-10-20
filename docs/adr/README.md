@@ -46,6 +46,7 @@ Each record captures one decision with its context, consequences and the alterna
 | [0021](0021-credit-funded-run-rate-and-teardown.md)         | Accept a credit-funded run rate and commit to teardown                        | Accepted |
 | [0026](0026-self-migrating-api-image-released-by-tag.md)    | Ship the API as a self-migrating image, released by tag                       | Accepted |
 | [0029](0029-trust-githubs-immutable-oidc-subject.md)        | Trust GitHub's immutable OIDC subject                                         | Accepted |
+| [0035](0035-end-to-end-tests-on-a-full-docker-build.md)     | Run end-to-end tests on a full Docker build of the application                | Accepted |
 | **Additional features**                                     |                                                                               |          |
 | [0022](0022-home-screen-tasks-and-user-employee-link.md)    | Add a personal home screen with tasks, linking logins to employees            | Accepted |
 | [0032](0032-managers-assign-tasks-to-direct-reports.md)     | Let managers assign tasks to their direct reports                             | Accepted |
