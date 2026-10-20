@@ -1,6 +1,6 @@
 # ADR-0004: NestJS as the API framework
 
-- **Status:** Accepted
+- **Status:** Accepted; API docs off in production by default per [ADR-0033](0033-keep-api-docs-off-the-public-deployment.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0003](0003-typescript-monorepo-with-shared-schemas.md), [ADR-0006](0006-postgresql-via-prisma.md), [ADR-0014](0014-self-hosted-jwt-auth-and-salary-masking.md)
@@ -25,7 +25,7 @@ The cross-cutting concerns map onto first-class framework constructs:
 | Validation             | Pipe bound to the shared zod schemas ([ADR-0003](0003-typescript-monorepo-with-shared-schemas.md)) |
 | Error shaping          | Exception filter                                                                                   |
 
-`@nestjs/swagger` generates OpenAPI documentation at `/api/docs` from the existing decorators.
+`@nestjs/swagger` generates OpenAPI documentation at `/api/docs` from the existing decorators. Production does not serve it by default ([ADR-0033](0033-keep-api-docs-off-the-public-deployment.md)).
 
 ## Consequences
 

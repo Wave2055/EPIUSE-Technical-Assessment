@@ -45,7 +45,7 @@ pnpm --filter @epiuse/api db:seed       # starter organisation and the two login
 pnpm dev                                # API on :3000, web on http://localhost:5173
 ```
 
-The web dev server forwards `/api` to the local API, just as CloudFront does in production.
+The web dev server forwards `/api` to the local API, just as CloudFront does in production. Interactive API docs are at http://localhost:3000/api/docs; the live deployment does not serve them ([ADR-0033](docs/adr/0033-keep-api-docs-off-the-public-deployment.md)).
 
 ## Tests
 

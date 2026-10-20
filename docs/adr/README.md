@@ -17,6 +17,7 @@ Each record captures one decision with its context, consequences and the alterna
 | [0005](0005-react-vite-spa-for-the-web-client.md)           | React + Vite SPA for the web client                                           | Accepted |
 | [0030](0030-web-session-renewal.md)                         | Restore and renew web sessions from the refresh cookie, one request at a time | Accepted |
 | [0031](0031-load-the-whole-organisation-into-the-client.md) | Load the whole organisation into the web client                               | Accepted |
+| [0033](0033-keep-api-docs-off-the-public-deployment.md)     | Keep the API docs off the public deployment                                   | Accepted |
 | **Data and domain**                                         |                                                                               |          |
 | [0006](0006-postgresql-via-prisma.md)                       | PostgreSQL via Prisma as the system of record                                 | Accepted |
 | [0007](0007-adjacency-list-for-the-hierarchy.md)            | Model the reporting hierarchy as an adjacency list                            | Accepted |
