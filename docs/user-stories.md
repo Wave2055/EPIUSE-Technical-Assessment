@@ -92,10 +92,16 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 **US-15 — See my own team and tasks.** As a signed-in employee, I want a home page showing my profile, my direct reports and my to-do list, so that the application is useful day to day, not only to HR ([ADR-0022](adr/0022-home-screen-tasks-and-user-employee-link.md)).
 
 - I can add, update and delete my own tasks, and see my direct reports' tasks.
+- Tasks my manager gave me show who they came from, and stay mine to update or remove.
+
+**US-16 — Give my team work.** As a manager, I want to add a task to a direct report's list, so that I can delegate from the same place I see what the team is working on ([ADR-0032](adr/0032-managers-assign-tasks-to-direct-reports.md)).
+
+- The team view has an add row under each direct report. Only direct reports can be given tasks, and the API refuses anyone else.
+- I can change or delete a task I assigned while that person still reports to me.
 
 ### Delivery
 
-**US-16 — Use it from a URL.** As an assessor, I want to open one link and use the live system, so that I can evaluate it without installing anything.
+**US-17 — Use it from a URL.** As an assessor, I want to open one link and use the live system, so that I can evaluate it without installing anything.
 
 - Live at https://d1qxvq2ahpxf8h.cloudfront.net. One address serves both the web app and the API ([ADR-0016](adr/0016-single-cloudfront-distribution-dual-origin.md)).
 - All data lives in PostgreSQL on AWS and is backed up to S3 nightly. Nothing in the submitted app is mocked ([ADR-0023](adr/0023-postgresql-container-on-the-api-instance.md), [ADR-0031](adr/0031-load-the-whole-organisation-into-the-client.md)).
@@ -115,6 +121,6 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 | Table sortable and filterable on any field                               | US-09 (birth date and salary sort but do not yet filter) |
 | Gravatar integration                                                     | US-10                                                    |
 | Avatar upload _(optional)_                                               | US-11                                                    |
-| Deployed to the cloud at a URL                                           | US-16                                                    |
-| No mocked data; changes stored in a remote database                      | US-16                                                    |
-| Additional features                                                      | US-12 to US-15                                           |
+| Deployed to the cloud at a URL                                           | US-17                                                    |
+| No mocked data; changes stored in a remote database                      | US-17                                                    |
+| Additional features                                                      | US-12 to US-16                                           |

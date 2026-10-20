@@ -1,6 +1,6 @@
 # ADR-0022: Add a personal home screen with tasks, linking logins to employees
 
-- **Status:** Accepted
+- **Status:** Accepted; managers may assign tasks to direct reports per [ADR-0032](0032-managers-assign-tasks-to-direct-reports.md)
 - **Date:** 2026-10-17
 - **Deciders:** Jaitin
 - **Related:** [ADR-0014](0014-self-hosted-jwt-auth-and-salary-masking.md) (amended), [ADR-0007](0007-adjacency-list-for-the-hierarchy.md), [ADR-0010](0010-explicit-deletion-strategies.md)
