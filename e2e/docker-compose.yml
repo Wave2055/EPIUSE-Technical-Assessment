@@ -1,0 +1,60 @@
+# End-to-end stack (ADR-0035): the production API image and web build, on PostgreSQL,
+# behind a CloudFront stand-in. Run it with `pnpm test:e2e:docker`, which supplies the
+# secrets below, seeds the database, runs Playwright and tears everything down.
+name: epiuse-e2e
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: epiuse
+      POSTGRES_DB: epiuse
+      # Password-less: a throwaway database reachable only on this compose network.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U epiuse -d epiuse']
+      interval: 2s
+      retries: 30
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    # Production mode: origin secret required, secure cookies, no API docs.
+    environment:
+      DATABASE_URL: postgresql://epiuse@db:5432/epiuse
+      JWT_ACCESS_SECRET: ${E2E_JWT_SECRET:?Run through scripts/e2e-docker.sh}
+      ORIGIN_SECRET: ${E2E_ORIGIN_SECRET:?Run through scripts/e2e-docker.sh}
+      SEED_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:?Run through scripts/e2e-docker.sh}
+      SEED_VIEWER_PASSWORD: ${E2E_VIEWER_PASSWORD:?Run through scripts/e2e-docker.sh}
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 2s
+      retries: 60
+
+  edge:
+    build:
+      context: ..
+      dockerfile: e2e/edge.Dockerfile
+    environment:
+      ORIGIN_SECRET: ${E2E_ORIGIN_SECRET}
+    ports:
+      # Loopback only: the stack holds known test passwords.
+      - '127.0.0.1:${E2E_PORT:-8080}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/']
+      interval: 2s
+      retries: 30
