@@ -51,6 +51,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
       return new ApiError(status, STATUS_CODES[status] ?? 'INTERNAL', exception.message);
     }
 
+    // Express's body parser rejects a body before Nest sees the request, with its own
+    // http-errors object rather than an HttpException. Its 4xx answers are the client's fault.
+    const parserError = bodyParserError(exception);
+    if (parserError) return parserError;
+
     // The trigger is the correctness boundary (ADR-0008). Reaching it means the service
     // check was bypassed or raced, so the path is unknown; the refusal still stands.
     if (hasSqlState(exception, CYCLE_SQLSTATE)) {
@@ -75,6 +80,19 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     return new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'INTERNAL', 'Something went wrong.');
   }
+}
+
+function bodyParserError(exception: unknown): ApiError | null {
+  if (!exception || typeof exception !== 'object') return null;
+  const { status, type } = exception as { status?: unknown; type?: unknown };
+  if (typeof status !== 'number' || typeof type !== 'string') return null;
+  if (status === 413) {
+    return new ApiError(413, 'PAYLOAD_TOO_LARGE', 'The request is too large.');
+  }
+  if (status >= 400 && status < 500) {
+    return new ApiError(400, 'VALIDATION_FAILED', 'The request body could not be read as JSON.');
+  }
+  return null;
 }
 
 /** Driver-adapter errors nest the Postgres code at varying depths, so search for it. */
