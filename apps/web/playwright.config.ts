@@ -1,8 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * One happy path, end to end: login → create → re-parent → search → delete → verify audit
- * (ADR-0020). Runs against a built SPA and a live API, not against mocks.
+ * Browser tests against a real API and database, never mocks (ADR-0020). The usual way to
+ * run them is `pnpm test:e2e:docker`, which builds and starts the whole application in
+ * Docker and sets E2E_BASE_URL (ADR-0035). Without E2E_BASE_URL they run against `pnpm dev`.
  */
 export default defineConfig({
   testDir: './e2e',
