@@ -24,8 +24,8 @@ Resolve the avatar **server-side** into a single `avatarUrl` on every employee D
 Implementation notes:
 
 - **SHA-256, not MD5.** Gravatar supports both; MD5 is the legacy default and is cryptographically broken. Nothing here depends on collision resistance, but there is no reason to ship a broken hash.
-- Uploads use a **presigned S3 `PUT`** issued by the API, with content-type and a 2 MB size cap enforced in the presign conditions — **not** in the UI, since client-side limits are advisory.
-- Objects are stored at `avatars/{employeeId}/{uuid}.webp`; the random component prevents a stale CDN cache serving a replaced image.
+- Uploads use a **presigned S3 `POST`** issued by the API, with content-type and a 2 MB size cap enforced in the policy conditions — **not** in the UI, since client-side limits are advisory. (A presigned `PUT` cannot enforce a size range; a POST policy's `content-length-range` can.) The web form checks the same limits first only to give a clearer message.
+- Objects are stored at `avatars/{employeeId}/{uuid}.{png|jpg|webp}`; the random component prevents a stale CDN cache serving a replaced image.
 
 ## Consequences
 
