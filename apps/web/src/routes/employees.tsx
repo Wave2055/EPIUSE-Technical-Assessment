@@ -80,7 +80,8 @@ const filterFn_allWords = constructFilterFn({
     words.every((word) => dataValue?.includes(word)),
   autoRemove: (value) => String(value ?? '').trim() === '',
   resolveFilterValue: (value) => String(value).toLowerCase().split(/\s+/).filter(Boolean),
-  resolveDataValue: (value) => (value == null ? undefined : String(value).toLowerCase()),
+  resolveDataValue: (value) =>
+    value === null || value === undefined ? undefined : String(value).toLowerCase(),
 });
 
 const features = tableFeatures({
