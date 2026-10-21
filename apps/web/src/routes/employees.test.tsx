@@ -87,3 +87,82 @@ describe('EmployeesTable range filters', () => {
     expect(screen.queryByRole('button', { name: 'Filter by salary' })).not.toBeInTheDocument();
   });
 });
+
+describe('EmployeesTable text filters, search and name sorting', () => {
+  const people = [
+    {
+      ...employee(1, 'Amahle', '1985-03-14', 1),
+      lastName: 'Zulu',
+      position: 'Engineering Manager',
+    },
+    { ...employee(2, 'Bongani', '1992-07-01', 1), lastName: 'Mokoena', email: 'bm@corp.co.za' },
+    { ...employee(3, 'Carla', '1999-11-30', 1), lastName: 'Adams' },
+  ];
+  const names = () =>
+    screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelector('.font-medium')?.textContent)
+      .filter(Boolean);
+
+  beforeEach(() => {
+    isAdmin = true;
+  });
+
+  it('searches email, which only shows under the name', async () => {
+    render(<EmployeesTable employees={people} />);
+    await userEvent.type(screen.getByLabelText('Search employees'), 'corp.co.za');
+    expect(names()).toEqual(['Bongani Mokoena']);
+  });
+
+  it('needs every searched word to match, each in any field', async () => {
+    render(<EmployeesTable employees={people} />);
+    await userEvent.type(screen.getByLabelText('Search employees'), 'amahle manager');
+    expect(names()).toEqual(['Amahle Zulu']);
+    await userEvent.type(screen.getByLabelText('Search employees'), ' nobody');
+    expect(names()).toEqual([]);
+  });
+
+  it('filters on surname, employee number and email separately', async () => {
+    render(<EmployeesTable employees={people} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Filter by name, number or email' }));
+
+    fireEvent.change(screen.getByLabelText('Surname contains'), { target: { value: 'mok' } });
+    expect(names()).toEqual(['Bongani Mokoena']);
+    expect(
+      screen.getByRole('button', { name: 'Filter by name, number or email' }),
+    ).toHaveTextContent('Details (1)');
+
+    fireEvent.change(screen.getByLabelText('Surname contains'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Employee number contains'), {
+      target: { value: '0003' },
+    });
+    expect(names()).toEqual(['Carla Adams']);
+
+    fireEvent.change(screen.getByLabelText('Employee number contains'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Email contains'), { target: { value: 'amahle@' } });
+    expect(names()).toEqual(['Amahle Zulu']);
+  });
+
+  it('sorts by first name by default, and by surname on request', async () => {
+    render(<EmployeesTable employees={people} />);
+    expect(names()).toEqual(['Amahle Zulu', 'Bongani Mokoena', 'Carla Adams']);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Surname' }));
+    expect(names()).toEqual(['Carla Adams', 'Bongani Mokoena', 'Amahle Zulu']);
+  });
+
+  it('never shows the columns that exist only for filtering', () => {
+    render(<EmployeesTable employees={people} />);
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers).toEqual([
+      'First nameSurname',
+      'Number',
+      'Role',
+      'Manager',
+      'Birth date',
+      'Salary',
+      'Actions',
+    ]);
+  });
+});
