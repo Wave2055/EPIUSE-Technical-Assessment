@@ -23,11 +23,14 @@ function localToday() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Numbered in order, not at random: two random numbers can collide, and the duplicate
+// would fail with 409. Each spec file has its own database, and nothing else uses E-5xxx.
+let sequence = 0;
 const newEmployee = (overrides: Record<string, unknown> = {}) => ({
   firstName: 'Edge',
   lastName: 'Case',
-  employeeNumber: `E-${Math.floor(5000 + Math.random() * 4999)}`,
-  email: `edge.${Math.random().toString(36).slice(2, 10)}@example.com`,
+  employeeNumber: `E-${5000 + ++sequence}`,
+  email: `edge.${sequence}@example.com`,
   birthDate: '1990-06-15',
   salary: 500_000,
   position: 'Analyst',
