@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
   CreateEmployeeInput,
+  CreateEmployeeResponse,
   DeleteEmployeeQuery,
   DeleteStrategyName,
   Employee,
@@ -8,10 +9,12 @@ import type {
   Paginated,
   UpdateEmployeeInput,
 } from '@epiuse/shared';
+import { hashPassword, generateTemporaryPassword } from '../auth/password.js';
 import { notFound } from '../common/errors/api-error.js';
 import type { RequestUser } from '../common/request-user.js';
 import { HierarchyService } from '../hierarchy/hierarchy.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertNotLastActiveAdmin, assertNotSelf } from '../users/account-rules.js';
 import type { DeleteStrategy } from './delete-strategies/delete-strategy.js';
 import { PromoteStrategy } from './delete-strategies/promote.strategy.js';
 import { ReassignStrategy } from './delete-strategies/reassign.strategy.js';
@@ -52,15 +55,35 @@ export class EmployeesService {
     return this.mapper.toDto(row);
   }
 
-  async create(input: CreateEmployeeInput, user: RequestUser): Promise<Employee> {
+  /**
+   * Every employee gets a login, created in the same transaction (ADR-0036): a regular user,
+   * signed in with their employee email and a one-time password that is returned here and
+   * nowhere else. If the login cannot be created, neither is the employee.
+   */
+  async create(input: CreateEmployeeInput, user: RequestUser): Promise<CreateEmployeeResponse> {
+    const temporaryPassword = generateTemporaryPassword();
+    const passwordHash = await hashPassword(temporaryPassword);
     const row = await this.prisma.auditedTransaction(user.id, async (tx) => {
       await this.hierarchy.assertValidManager(tx, null, input.managerId);
-      return tx.employee.create({
+      const employee = await tx.employee.create({
         data: { ...input, birthDate: fromIsoDate(input.birthDate) },
         include: employeeInclude,
       });
+      await tx.user.create({
+        data: {
+          email: employee.email,
+          passwordHash,
+          role: 'VIEWER',
+          employeeId: employee.id,
+          mustChangePassword: true,
+        },
+      });
+      return employee;
     });
-    return this.mapper.toDto(row);
+    return {
+      employee: this.mapper.toDto(row),
+      login: { email: row.email, temporaryPassword },
+    };
   }
 
   async update(id: string, input: UpdateEmployeeInput, user: RequestUser): Promise<Employee> {
@@ -93,6 +116,14 @@ export class EmployeesService {
         select: { id: true, firstName: true, lastName: true, managerId: true },
       });
       if (!target) throw notFound('That employee');
+
+      // Deleting an employee deletes their login (ADR-0036), so the same rules apply as to
+      // deactivating it: never your own, never the last admin.
+      const login = await tx.user.findUnique({ where: { employeeId: id }, select: { id: true } });
+      if (login) {
+        assertNotSelf(user.id, login.id, 'delete the employee record of');
+        await assertNotLastActiveAdmin(tx, login.id);
+      }
 
       const reportCount = await tx.employee.count({ where: { managerId: id } });
       if (reportCount > 0) {

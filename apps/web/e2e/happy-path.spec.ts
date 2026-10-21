@@ -50,6 +50,9 @@ test.describe('employee lifecycle', () => {
     await pickManager(page, /Thandi Nkosi/);
     await sheet.getByRole('button', { name: 'Add employee' }).click();
     await expect(page.getByText(`Added ${fullName}`)).toBeVisible();
+    // Their login was created too; the one-time password is shown once (ADR-0036).
+    await expect(page.getByRole('heading', { name: 'Login created' })).toBeVisible();
+    await page.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('row', { name: new RegExp(fullName) })).toContainText(
       'Thandi Nkosi',
     );

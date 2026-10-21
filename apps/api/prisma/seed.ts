@@ -110,6 +110,21 @@ async function main() {
     },
   });
 
+  // Every employee has a login (ADR-0036). The rest start with none set: an admin issues a
+  // one-time password from the Users page when someone needs access.
+  const withLogins = new Set(['E-0004', 'E-0019']);
+  await prisma.user.createMany({
+    data: employees
+      .filter(([number]) => !withLogins.has(number))
+      .map(([number, first, last]) => ({
+        email: email(first, last),
+        passwordHash: null,
+        role: 'VIEWER' as const,
+        employeeId: ids.get(number)!,
+        mustChangePassword: true,
+      })),
+  });
+
   await prisma.task.createMany({
     data: tasks.map(([number, title, status, due]) => ({
       employeeId: ids.get(number)!,
@@ -120,7 +135,7 @@ async function main() {
   });
 
   console.warn(
-    `Seeded ${employees.length} employees, 2 logins (admin@example.com, viewer@example.com) and ${tasks.length} tasks.`,
+    `Seeded ${employees.length} employees, each with a login (passwords set for admin@example.com and viewer@example.com), and ${tasks.length} tasks.`,
   );
 }
 

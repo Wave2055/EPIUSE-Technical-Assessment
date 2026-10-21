@@ -81,7 +81,12 @@ export async function apiAs(request: APIRequestContext, who: Login) {
         },
       });
       expect(res.status(), await res.text()).toBe(201);
-      return (await res.json()) as { id: string; managerId: string | null };
+      // Creating an employee also creates their login (ADR-0036).
+      const body = (await res.json()) as {
+        employee: { id: string; managerId: string | null; firstName: string; lastName: string };
+        login: { email: string; temporaryPassword: string };
+      };
+      return { ...body.employee, login: body.login };
     },
     async employee(id: string) {
       const res = await request.get(`/api/employees/${id}`, { headers });
@@ -94,6 +99,11 @@ export async function apiAs(request: APIRequestContext, who: Login) {
     async deleteEmployee(id: string) {
       await request.delete(`/api/employees/${id}`, { headers });
     },
+    async userIdFor(email: string) {
+      const res = await request.get('/api/users', { headers });
+      const { users } = (await res.json()) as { users: { id: string; email: string }[] };
+      return users.find((u) => u.email === email)!.id;
+    },
   };
 }
 
@@ -103,4 +113,26 @@ export async function pickBirthDate(page: Page, year: string, month: string, lab
   await page.getByRole('combobox', { name: /year/i }).selectOption(year);
   await page.getByRole('combobox', { name: /month/i }).selectOption({ label: month });
   await page.getByRole('button', { name: label }).click();
+}
+
+/**
+ * Signs a new login in with its one-time password and replaces it, through the API, so a test
+ * can start from an ordinary active user (ADR-0036).
+ */
+export async function activateLogin(
+  request: APIRequestContext,
+  login: { email: string; temporaryPassword: string },
+  newPassword: string,
+) {
+  const signedIn = await request.post('/api/auth/login', {
+    data: { email: login.email, password: login.temporaryPassword },
+  });
+  expect(signedIn.ok()).toBe(true);
+  const { accessToken } = (await signedIn.json()) as { accessToken: string };
+  const changed = await request.post('/api/auth/password', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    data: { currentPassword: login.temporaryPassword, newPassword },
+  });
+  expect(changed.ok(), await changed.text()).toBe(true);
+  return { email: login.email, password: newPassword };
 }

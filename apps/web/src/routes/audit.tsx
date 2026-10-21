@@ -1,5 +1,5 @@
 import { Lock } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Loading } from '@/components/loading';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AccountTrail } from '@/features/audit/account-trail';
 import { formatDateTime } from '@/features/employees/format';
 import type { AuditAction } from '@/features/employees/types';
 import { cn } from '@/lib/utils';
@@ -56,10 +58,30 @@ export function AuditRoute() {
       </section>
     );
   }
-  return <AuditTrail />;
+  return <AuditViews />;
 }
 
-function AuditTrail() {
+type View = 'employees' | 'accounts';
+
+/** Employee records and logins are audited separately (ADR-0011, ADR-0036). */
+function AuditViews() {
+  const [view, setView] = useState<View>('employees');
+  const switcher = (
+    <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+      <TabsList>
+        <TabsTrigger value="employees">Employee changes</TabsTrigger>
+        <TabsTrigger value="accounts">Account changes</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+  return view === 'employees' ? (
+    <AuditTrail switcher={switcher} />
+  ) : (
+    <AccountTrail switcher={switcher} />
+  );
+}
+
+function AuditTrail({ switcher }: { switcher: ReactNode }) {
   const [action, setAction] = useState<AuditAction | 'all'>('all');
   const trail = useAuditTrail(action === 'all' ? undefined : action);
   const rows = trail.data?.pages.flatMap((page) => page.items) ?? [];
@@ -75,19 +97,22 @@ function AuditTrail() {
             {trail.isSuccess && ` Showing ${rows.length} of ${total}.`}
           </p>
         </div>
-        <Select value={action} onValueChange={(v) => setAction(v as AuditAction | 'all')}>
-          <SelectTrigger className="w-48" aria-label="Filter by change type">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All changes</SelectItem>
-            {(Object.keys(ACTION_LABELS) as AuditAction[]).map((a) => (
-              <SelectItem key={a} value={a}>
-                {ACTION_LABELS[a]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          {switcher}
+          <Select value={action} onValueChange={(v) => setAction(v as AuditAction | 'all')}>
+            <SelectTrigger className="w-48" aria-label="Filter by change type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All changes</SelectItem>
+              {(Object.keys(ACTION_LABELS) as AuditAction[]).map((a) => (
+                <SelectItem key={a} value={a}>
+                  {ACTION_LABELS[a]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {trail.isPending && <Loading />}

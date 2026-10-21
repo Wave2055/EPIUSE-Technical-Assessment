@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -25,8 +26,15 @@ export interface TestApp {
  * the full Nest app with the same global prefix, guards, filter and interceptors.
  *
  * `env` overrides or adds settings, e.g. ORIGIN_SECRET to exercise the origin check.
+ *
+ * `unthrottled` makes every request look like a different CloudFront viewer, for suites that
+ * sign in far more than the login limit allows from one address. The rate limit itself is
+ * tested by rate-limit.int-spec.ts, which does not use it.
  */
-export async function startTestApp(env: Record<string, string> = {}): Promise<TestApp> {
+export async function startTestApp(
+  env: Record<string, string> = {},
+  { unthrottled = false }: { unthrottled?: boolean } = {},
+): Promise<TestApp> {
   const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(
     'postgres:17-alpine',
   ).start();
@@ -48,9 +56,18 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
   delete process.env.AVATAR_BUCKET;
   delete process.env.API_DOCS;
   Object.assign(process.env, env);
+  const originSecret = 'integration-unthrottled-origin';
+  if (unthrottled) process.env.ORIGIN_SECRET = originSecret;
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication({ logger: false });
+  if (unthrottled) {
+    app.use((req: { headers: Record<string, string> }, _res: unknown, next: () => void) => {
+      req.headers['x-origin-secret'] = originSecret;
+      req.headers['cloudfront-viewer-address'] = `${randomUUID()}:443`;
+      next();
+    });
+  }
   configureApp(app);
   await app.init();
 
@@ -93,18 +110,23 @@ export async function insertEmployee(
   });
 }
 
+/**
+ * Inserts a login with the shared test password. Every login belongs to an employee
+ * (ADR-0036), so one is created when none is given.
+ */
 export async function insertUser(
   prisma: PrismaService,
   role: Role,
   employeeId: string | null = null,
 ) {
+  const owner = employeeId ?? (await insertEmployee(prisma)).id;
   counter += 1;
   return prisma.user.create({
     data: {
       email: `${role.toLowerCase()}${counter}@example.com`,
       passwordHash: await hashPassword(PASSWORD),
       role,
-      employeeId,
+      employeeId: owner,
     },
   });
 }

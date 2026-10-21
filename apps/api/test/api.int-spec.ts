@@ -63,11 +63,13 @@ describe('HTTP API', () => {
         .set(auth(admin.token))
         .send(newEmployee())
         .expect(201);
-      expect(created.body).toMatchObject({ employeeNumber: 'E-7001', salary: 810_000 });
-      expect(created.body.avatarUrl).toMatch(/^https:\/\/gravatar\.com\/avatar\/[0-9a-f]{64}/);
+      expect(created.body.employee).toMatchObject({ employeeNumber: 'E-7001', salary: 810_000 });
+      expect(created.body.employee.avatarUrl).toMatch(
+        /^https:\/\/gravatar\.com\/avatar\/[0-9a-f]{64}/,
+      );
 
       const audit = await t.http
-        .get(`/api/audit?employeeId=${created.body.id}`)
+        .get(`/api/audit?employeeId=${created.body.employee.id}`)
         .set(auth(admin.token))
         .expect(200);
       expect(audit.body.items[0]).toMatchObject({
@@ -330,11 +332,6 @@ describe('HTTP API', () => {
         .set(auth(token))
         .send({ status: 'done' })
         .expect(404);
-    });
-
-    it('answers 409 NOT_LINKED for a login with no employee record', async () => {
-      const res = await t.http.get('/api/me/tasks').set(auth(admin.token)).expect(409);
-      expect(res.body.code).toBe('NOT_LINKED');
     });
   });
 });

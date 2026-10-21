@@ -12,3 +12,4 @@ export * from './errors.js';
 export * from './hierarchy.js';
 export * from './pagination.js';
 export * from './task.js';
+export * from './user.js';

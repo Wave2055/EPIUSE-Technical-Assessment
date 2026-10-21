@@ -73,10 +73,11 @@ The full picture, with every AWS service, is [diagram 2](diagrams.md#2-deploymen
 
 ### 2.3 Data
 
-Five tables ([diagram 4](diagrams.md#4-data-model)):
+Six tables ([diagram 4](diagrams.md#4-data-model)):
 
 - **`employees`**, with `manager_id` pointing at another employee: an adjacency list ([ADR-0007](adr/0007-adjacency-list-for-the-hierarchy.md)). Subtrees and ancestor chains are read with recursive CTEs.
-- **`users`**, separate from employees, because most employees never sign in. A login may link to one employee ([ADR-0022](adr/0022-home-screen-tasks-and-user-employee-link.md)).
+- **`users`**: logins. Every employee has exactly one, created and deleted with them ([ADR-0036](adr/0036-every-employee-has-a-login-managed-by-admins.md)).
+- **`user_audit`**, every change to a login, written only by a trigger like `employee_audit`.
 - **`refresh_tokens`**, hashed, grouped into rotation families.
 - **`employee_audit`**, written only by triggers ([ADR-0011](adr/0011-audit-trail-via-database-triggers.md)).
 - **`tasks`**, owned by an employee and optionally assigned by their manager ([ADR-0032](adr/0032-managers-assign-tasks-to-direct-reports.md)).
@@ -101,7 +102,7 @@ A person with no manager is valid. More than one is allowed and shown as a warni
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Sign-in        | argon2id password hashes; the same answer for an unknown email and a wrong password                                                                                                   | [ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)                                              |
 | Sessions       | 15-minute access token held in memory; 7-day refresh token in an httpOnly, Secure, SameSite cookie scoped to `/api/auth`, rotated on every use, with replay revoking the whole family | [ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md), [ADR-0030](adr/0030-web-session-renewal.md) |
-| Authorisation  | Global JWT guard; `@Roles('ADMIN')` on every write and on the audit trail                                                                                                             | [ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)                                              |
+| Authorisation  | Global JWT guard that reads the login on every request, so role changes and deactivations apply at once; `@Roles('ADMIN')` on every write, the audit trail and user management        | [ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)                                              |
 | Salary privacy | An interceptor nulls salaries for viewers; sorting or filtering by salary is refused for them, because order alone would leak it                                                      | [ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)                                              |
 | Abuse          | Every route rate-limited per viewer address; sign-in limited to 10 tries per 15 minutes                                                                                               | [ADR-0025](adr/0025-rate-limit-by-client-address.md)                                                         |
 | Origin         | Security group admits only CloudFront; the API requires CloudFront's secret header in production                                                                                      | [ADR-0016](adr/0016-single-cloudfront-distribution-dual-origin.md)                                           |
@@ -170,7 +171,8 @@ Each pattern is applied to a specific problem, not for its own sake.
 
 Built in addition to the requirements, as the brief invites:
 
-- **Sign-in with two roles**, admin and read-only viewer, with salaries hidden from viewers ([ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)).
+- **Sign-in with two roles**, admin and read-only regular user, with salaries hidden from regular users ([ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)).
+- **Account management**: every employee gets a login with a one-time password; admins promote, demote, deactivate and reset, audited ([ADR-0036](adr/0036-every-employee-has-a-login-managed-by-admins.md)).
 - **Audit trail** of every change, with who made it and each field's old and new value ([ADR-0011](adr/0011-audit-trail-via-database-triggers.md)).
 - **Home page with tasks**, where managers can assign tasks to their direct reports ([ADR-0022](adr/0022-home-screen-tasks-and-user-employee-link.md), [ADR-0032](adr/0032-managers-assign-tasks-to-direct-reports.md)).
 - **Explicit deletion strategies** that never orphan a team ([ADR-0010](adr/0010-explicit-deletion-strategies.md)).
@@ -183,7 +185,7 @@ Built in addition to the requirements, as the brief invites:
 - **One instance, one availability zone.** No autoscaling or failover ([ADR-0015](adr/0015-ec2-docker-for-api-compute.md)).
 - **Self-managed database** on that instance, backed up nightly: up to a day of writes could be lost, and recovery is manual ([ADR-0023](adr/0023-postgresql-container-on-the-api-instance.md)).
 - **CloudFront to the instance is plain HTTP** inside AWS's network ([ADR-0016](adr/0016-single-cloudfront-distribution-dual-origin.md)).
-- **No MFA, password reset or per-account lockout** ([ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)).
+- **No MFA, self-service password reset or per-account lockout**, and one-time passwords are handed over by the admin, with no email delivery ([ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md), [ADR-0036](adr/0036-every-employee-has-a-login-managed-by-admins.md)).
 - **Migrations run as the new image starts**, with no separate approval step ([ADR-0026](adr/0026-self-migrating-api-image-released-by-tag.md)).
 - **The whole organisation is loaded into the browser**: fine for thousands of employees, not tens of thousands ([ADR-0031](adr/0031-load-the-whole-organisation-into-the-client.md)).
 - **Deletion is permanent**; the audit trail records it but does not undo it ([ADR-0010](adr/0010-explicit-deletion-strategies.md)).

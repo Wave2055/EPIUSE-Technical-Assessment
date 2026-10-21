@@ -1,6 +1,6 @@
 # ADR-0014: Self-hosted JWT authentication with role-based salary masking
 
-- **Status:** Accepted; rate limiting in [ADR-0025](0025-rate-limit-by-client-address.md), web session handling in [ADR-0030](0030-web-session-renewal.md)
+- **Status:** Accepted; rate limiting in [ADR-0025](0025-rate-limit-by-client-address.md), web session handling in [ADR-0030](0030-web-session-renewal.md); logins, roles read per request, and admin account management per [ADR-0036](0036-every-employee-has-a-login-managed-by-admins.md)
 - **Date:** 2026-10-15
 - **Deciders:** Jaitin
 - **Related:** [ADR-0004](0004-nestjs-for-the-api.md), [ADR-0011](0011-audit-trail-via-database-triggers.md), [ADR-0012](0012-require-email-on-employee-record.md)

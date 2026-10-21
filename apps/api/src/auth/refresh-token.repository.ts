@@ -18,6 +18,8 @@ export abstract class RefreshTokenStore {
   /** Revokes one token if still live. False means someone else already used it. */
   abstract revoke(id: string): Promise<boolean>;
   abstract revokeFamily(familyId: string): Promise<void>;
+  /** Ends every session the user has, e.g. on a password change or deactivation. */
+  abstract revokeAllForUser(userId: string): Promise<void>;
 }
 
 @Injectable()
@@ -48,6 +50,13 @@ export class PrismaRefreshTokenStore extends RefreshTokenStore {
   async revokeFamily(familyId: string) {
     await this.prisma.refreshToken.updateMany({
       where: { familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeAllForUser(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
   }

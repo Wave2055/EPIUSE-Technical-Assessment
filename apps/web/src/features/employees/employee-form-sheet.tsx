@@ -38,6 +38,7 @@ import { useEmployees, useSaveEmployee } from './api';
 import { formatDate, fullName, parseIsoDate, toIsoDate } from './format';
 import { getEligibleManagers } from './hierarchy';
 import type { Employee } from './types';
+import { showOneTimePassword } from '@/features/users/one-time-password-store';
 
 const NO_MANAGER = 'none';
 
@@ -120,12 +121,14 @@ export function EmployeeFormSheet({
 
   async function onSubmit(values: z.output<typeof employeeSchema>) {
     try {
-      const saved = await save.mutateAsync({
+      const { employee: saved, login } = await save.mutateAsync({
         id: employee?.id,
         input: { ...values, managerId: values.managerId === NO_MANAGER ? null : values.managerId },
       });
       toast.success(employee ? `Saved ${fullName(saved)}` : `Added ${fullName(saved)}`);
       onOpenChange(false);
+      // Every new employee gets a login (ADR-0036): show its one-time password, once.
+      if (login) showOneTimePassword({ ...login, name: fullName(saved), reason: 'created' });
     } catch (error) {
       showApiError(error);
     }

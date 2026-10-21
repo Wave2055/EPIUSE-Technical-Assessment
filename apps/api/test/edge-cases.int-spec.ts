@@ -16,6 +16,13 @@ const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const SECRET = 'integration-test-signing-key-that-is-long-enough';
 const UNKNOWN_ID = '00000000-0000-4000-8000-000000000000';
 
+/** Today as the API sees it: the local date, not UTC, which differs around midnight. */
+function localToday() {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const newEmployee = (overrides: Record<string, unknown> = {}) => ({
   firstName: 'Edge',
   lastName: 'Case',
@@ -136,8 +143,15 @@ describe('edge cases', () => {
       await t.http.get('/api/employees').set(auth(unsigned)).expect(401);
     });
 
-    it('rejects a validly signed token claiming an unknown role', async () => {
-      const token = tokenFor({ sub: admin.id, email: admin.email, role: 'SUPERUSER' });
+    it('ignores the role a token claims, using the one on the login (ADR-0036)', async () => {
+      const viewer = await insertUser(t.prisma, 'VIEWER');
+      const token = tokenFor({ sub: viewer.id, email: viewer.email, role: 'ADMIN' });
+      await t.http.get('/api/employees').set(auth(token)).expect(200);
+      await t.http.get('/api/audit').set(auth(token)).expect(403);
+    });
+
+    it("rejects a validly signed token for a login that doesn't exist", async () => {
+      const token = tokenFor({ sub: UNKNOWN_ID, email: 'ghost@example.com', role: 'ADMIN' });
       await t.http.get('/api/employees').set(auth(token)).expect(401);
     });
 
@@ -172,7 +186,7 @@ describe('edge cases', () => {
 
   describe('employee validation', () => {
     it.each([
-      ['a birth date of today', { birthDate: new Date().toISOString().slice(0, 10) }, 'birthDate'],
+      ['a birth date of today', { birthDate: localToday() }, 'birthDate'],
       ['a birth date before 1900', { birthDate: '1899-12-31' }, 'birthDate'],
       ['an impossible date', { birthDate: '1990-02-30' }, 'birthDate'],
       ['a negative salary', { salary: -1 }, 'salary'],
@@ -207,7 +221,9 @@ describe('edge cases', () => {
         .set(auth(admin.token))
         .send(newEmployee({ firstName: 'Zoë', lastName: "O'Brien-Nkosi" }))
         .expect(201);
-      const read = await t.http.get(`/api/employees/${res.body.id}`).set(auth(admin.token));
+      const read = await t.http
+        .get(`/api/employees/${res.body.employee.id}`)
+        .set(auth(admin.token));
       expect(read.body).toMatchObject({ firstName: 'Zoë', lastName: "O'Brien-Nkosi" });
     });
 
@@ -217,7 +233,8 @@ describe('edge cases', () => {
         .set(auth(admin.token))
         .send(newEmployee({ email: '  Mixed.Case@Example.COM ' }))
         .expect(201);
-      expect(created.body.email).toBe('mixed.case@example.com');
+      expect(created.body.employee.email).toBe('mixed.case@example.com');
+      expect(created.body.login.email).toBe('mixed.case@example.com');
 
       const dup = await t.http
         .post('/api/employees')
@@ -233,8 +250,8 @@ describe('edge cases', () => {
         .set(auth(admin.token))
         .send(newEmployee({ id: UNKNOWN_ID, avatarKey: 'avatars/x.png' }))
         .expect(201);
-      expect(res.body.id).not.toBe(UNKNOWN_ID);
-      expect(res.body.hasUploadedAvatar).toBe(false);
+      expect(res.body.employee.id).not.toBe(UNKNOWN_ID);
+      expect(res.body.employee.hasUploadedAvatar).toBe(false);
     });
 
     it('refuses a manager who does not exist, on create and on update', async () => {
@@ -436,9 +453,11 @@ describe('edge cases', () => {
   });
 
   describe('me and tasks', () => {
-    it('shows an unlinked login with no employee and no team', async () => {
+    it('shows every login its own employee record', async () => {
       const res = await t.http.get('/api/me').set(auth(admin.token)).expect(200);
-      expect(res.body).toMatchObject({ employee: null, manager: null, directReports: [] });
+      const login = await t.prisma.user.findUniqueOrThrow({ where: { id: admin.id } });
+      expect(res.body.employee.id).toBe(login.employeeId);
+      expect(res.body.user.mustChangePassword).toBe(false);
     });
 
     it('validates task input', async () => {
