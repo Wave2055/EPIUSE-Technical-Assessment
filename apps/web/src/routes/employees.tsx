@@ -1,5 +1,7 @@
 import {
   columnFilteringFeature,
+  columnVisibilityFeature,
+  constructFilterFn,
   createColumnHelper,
   createFilteredRowModel,
   createSortedRowModel,
@@ -26,6 +28,7 @@ import {
   Pencil,
   Plus,
   Search,
+  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -68,15 +71,30 @@ import type { Employee } from '@/features/employees/types';
 import { useIsAdmin } from '@/features/auth/session';
 import { cn } from '@/lib/utils';
 
+/**
+ * The search box's match: every word must appear somewhere in the row, so "aisha manager"
+ * finds Aisha Patel, Engineering Manager, as the API's own search does.
+ */
+const filterFn_allWords = constructFilterFn({
+  filter: (dataValue: string | undefined, words: string[]) =>
+    words.every((word) => dataValue?.includes(word)),
+  autoRemove: (value) => String(value ?? '').trim() === '',
+  resolveFilterValue: (value) => String(value).toLowerCase().split(/\s+/).filter(Boolean),
+  resolveDataValue: (value) =>
+    value === null || value === undefined ? undefined : String(value).toLowerCase(),
+});
+
 const features = tableFeatures({
   rowSortingFeature,
   columnFilteringFeature,
+  columnVisibilityFeature,
   globalFilteringFeature,
   sortedRowModel: createSortedRowModel(),
   filteredRowModel: createFilteredRowModel(),
   sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text, basic: sortFn_basic },
   filterFns: {
     includesString: filterFn_includesString,
+    allWords: filterFn_allWords,
     equalsString: filterFn_equalsString,
     inDateRange: filterFn_inDateRange,
     inNumberRange: filterFn_inNumberRange,
@@ -84,7 +102,13 @@ const features = tableFeatures({
   columnMeta: {} as { align?: 'left' | 'right' },
 });
 
-type Row = Employee & { name: string; managerName: string };
+type Row = Employee & { name: string; managerName: string; search: string };
+
+/**
+ * Columns that exist only to be sorted, filtered or searched on. The Name column shows
+ * first name, surname and email together, so each needs its own column behind it.
+ */
+const HIDDEN = { firstName: false, lastName: false, email: false, search: false };
 
 /** A range filter's value: `[from, to]` as typed, either end blank for open-ended. */
 type Range = [string, string];
@@ -122,6 +146,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
         ...e,
         name: fullName(e),
         managerName: e.manager ? fullName(e.manager) : '',
+        search: [fullName(e), e.employeeNumber, e.email, e.position].join(' '),
       })),
     [employees],
   );
@@ -139,8 +164,14 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
     () =>
       col.columns([
         col.accessor('name', {
-          header: 'Name',
-          sortFn: 'text',
+          // Sorted through the hidden columns, so either first name or surname can lead.
+          header: ({ table }) => (
+            <span className="inline-flex items-center gap-1">
+              <SortButton column={table.getColumn('firstName')!}>First name</SortButton>
+              <SortButton column={table.getColumn('lastName')!}>Surname</SortButton>
+            </span>
+          ),
+          enableSorting: false,
           cell: ({ row }) => (
             <div className="flex items-center gap-3">
               <EmployeeAvatar employee={row.original} />
@@ -151,9 +182,14 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
             </div>
           ),
         }),
+        col.accessor('firstName', { sortFn: 'text', filterFn: 'includesString' }),
+        col.accessor('lastName', { sortFn: 'text', filterFn: 'includesString' }),
+        col.accessor('email', { filterFn: 'includesString' }),
+        col.accessor('search', { filterFn: 'allWords' }),
         col.accessor('employeeNumber', {
           header: 'Number',
           sortFn: 'alphanumeric',
+          filterFn: 'includesString',
           cell: (info) => <span className="font-mono text-xs">{info.getValue()}</span>,
         }),
         col.accessor('position', { header: 'Role', sortFn: 'text', filterFn: 'equalsString' }),
@@ -228,8 +264,10 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
     features,
     columns,
     data,
-    globalFilterFn: 'includesString',
-    initialState: { sorting: [{ id: 'name', desc: false }] },
+    // Only the search column takes part, so one word cannot match a salary or a date.
+    globalFilterFn: 'allWords',
+    getColumnCanGlobalFilter: (column) => column.id === 'search',
+    initialState: { sorting: [{ id: 'firstName', desc: false }], columnVisibility: HIDDEN },
   });
 
   const globalFilter = (table.state.globalFilter as string | undefined) ?? '';
@@ -303,6 +341,14 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
             ))}
           </SelectContent>
         </Select>
+        <TextFilters
+          columns={[
+            { column: table.getColumn('firstName'), label: 'First name' },
+            { column: table.getColumn('lastName'), label: 'Surname' },
+            { column: table.getColumn('employeeNumber'), label: 'Employee number' },
+            { column: table.getColumn('email'), label: 'Email' },
+          ]}
+        />
         <RangeFilter
           column={table.getColumn('birthDate')}
           label="Birth date"
@@ -357,7 +403,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id}>
-                {row.getAllCells().map((cell) => (
+                {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}
                     className={cn(cell.column.columnDef.meta?.align === 'right' && 'text-right')}
@@ -370,7 +416,7 @@ export function EmployeesTable({ employees }: { employees: Employee[] }) {
             {rows.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={table.getVisibleLeafColumns().length}
                   className="h-32 text-center text-muted-foreground"
                 >
                   No employees match these filters.
@@ -487,6 +533,46 @@ function RangeFilter({
             onChange={(e) => set([from, e.target.value])}
           />
         </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * "Contains" filters for the text fields, together in one popover so the toolbar stays
+ * short. The search box already looks across all of them; these narrow one field each.
+ */
+function TextFilters({
+  columns,
+}: {
+  columns: { column: Column<typeof features, Row> | undefined; label: string }[];
+}) {
+  const active = columns.filter(({ column }) => column?.getFilterValue()).length;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          aria-label="Filter by name, number or email"
+          className={cn(active > 0 && 'border-primary/50')}
+        >
+          <SlidersHorizontal className="size-4" /> {active > 0 ? `Details (${active})` : 'Details'}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="grid gap-3">
+        {columns.map(
+          ({ column, label }) =>
+            column && (
+              <div key={column.id} className="grid gap-1.5">
+                <Label htmlFor={`${column.id}-contains`}>{label} contains</Label>
+                <Input
+                  id={`${column.id}-contains`}
+                  value={(column.getFilterValue() as string | undefined) ?? ''}
+                  onChange={(e) => column.setFilterValue(e.target.value || undefined)}
+                />
+              </div>
+            ),
+        )}
       </PopoverContent>
     </Popover>
   );

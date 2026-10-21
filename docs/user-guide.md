@@ -126,8 +126,9 @@ Choose **Find an employee** (or press **Ctrl K**, **⌘ K** on a Mac) and type p
 
 - **Search** matches name, employee number, email and role. Several words must all match, so "aisha manager" finds Aisha Patel, Engineering Manager.
 - **All roles** and **All managers** narrow the list to one role or one manager's direct reports.
+- **Details** filters one field at a time: first name, surname, employee number or email, each matching any part of it. The button shows how many are in use.
 - **Birth date** and **Salary** _(admins)_ filter by a range. Fill in either end, or both; an empty end means "no limit". Both ends are included.
-- **Sort** by any column: select its heading. Select again to reverse it. Salary sorts highest first on the first select; the other columns start A to Z or earliest first.
+- **Sort** by any column: select its heading. Select again to reverse it. The name column has two headings, **First name** and **Surname**, so either can lead. Salary sorts highest first on the first select; the other columns start A to Z or earliest first.
 - **Clear** removes every filter at once.
 
 ![Filtering by salary](images/employees-salary-filter.png)

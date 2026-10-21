@@ -102,14 +102,14 @@ Priority: **M** must (the brief), **S** should (extension). Verification: **U** 
 
 ### 3.3 Viewing and finding
 
-| ID    | Requirement                                                                                                                                   | Pri | Source | Verified |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| FR-20 | The organisation is shown as an interactive tree that can be panned and zoomed, with each person's picture, name, role and number of reports. | M   | B      | U, E     |
-| FR-21 | Users can search the hierarchy by name, role or employee number and open the person found.                                                    | M   | B      | E        |
-| FR-22 | From a search result, admins can edit or delete the person.                                                                                   | M   | B      | E        |
-| FR-23 | A table lists every employee, sortable on every field.                                                                                        | M   | B      | U, E     |
-| FR-24 | The table filters on every field: free text across name, number, email and role; role; manager; birth-date range; salary range.               | M   | B      | U, E     |
-| FR-25 | Search text is matched literally; `%`, `_` and quotes have no special meaning.                                                                | S   | X      | U, I     |
+| ID    | Requirement                                                                                                                                                                                                   | Pri | Source | Verified |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
+| FR-20 | The organisation is shown as an interactive tree that can be panned and zoomed, with each person's picture, name, role and number of reports.                                                                 | M   | B      | U, E     |
+| FR-21 | Users can search the hierarchy by name, role or employee number and open the person found.                                                                                                                    | M   | B      | E        |
+| FR-22 | From a search result, admins can edit or delete the person.                                                                                                                                                   | M   | B      | E        |
+| FR-23 | A table lists every employee, sortable on every field, with first name and surname sortable separately.                                                                                                       | M   | B      | U, E     |
+| FR-24 | The table filters on every field: free text across name, number, email and role, every word matching; first name, surname, number and email each on their own; role; manager; birth-date range; salary range. | M   | B      | U, E     |
+| FR-25 | Search text is matched literally; `%`, `_` and quotes have no special meaning.                                                                                                                                | S   | X      | U, I     |
 
 ### 3.4 Pictures
 

@@ -40,6 +40,29 @@ test.describe('the employee table', () => {
     await expect(page.getByRole('row', { name: /Thandi Nkosi/ })).toHaveCount(0);
   });
 
+  test('filters by surname and email, and sorts by surname', async ({ page }) => {
+    await page.getByRole('button', { name: 'Filter by name, number or email' }).click();
+    await page.getByLabel('Surname contains').fill('khumalo');
+    await expect(page.getByRole('row', { name: /Zanele Khumalo/ })).toBeVisible();
+    await expect(page.getByText(/^1 of \d+ employees$/)).toBeVisible();
+    await page.getByLabel('Surname contains').fill('');
+    await page.getByLabel('Email contains').fill('pieter.vanwyk@');
+    await expect(page.getByRole('row', { name: new RegExp(admin.name) })).toBeVisible();
+    await expect(page.getByText(/^1 of \d+ employees$/)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: /Clear/ }).click();
+
+    await page.getByRole('button', { name: 'Surname', exact: true }).click();
+    // Seeded first names are one word, so the rest of the name is the surname ("van Wyk").
+    const surnames = await page
+      .locator('tbody tr span.text-heading')
+      .evaluateAll((names) => names.map((n) => n.textContent!.split(' ').slice(1).join(' ')));
+    expect(surnames.length).toBeGreaterThan(10);
+    expect(surnames).toEqual(
+      [...surnames].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })),
+    );
+  });
+
   test('shows a message when nothing matches', async ({ page }) => {
     await page.getByLabel('Search employees').fill('zzzz-no-match');
     await expect(page.getByText('No employees match these filters.')).toBeVisible();
