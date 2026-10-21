@@ -4,6 +4,7 @@ import {
   AvatarUploadRequestSchema,
   AvatarUploadResponseSchema,
   ConfirmAvatarSchema,
+  CreateEmployeeResponseSchema,
   CreateEmployeeSchema,
   DeleteEmployeeQuerySchema,
   EmployeeListQuerySchema,
@@ -14,6 +15,7 @@ import {
   type AvatarUploadResponse,
   type ConfirmAvatarInput,
   type CreateEmployeeInput,
+  type CreateEmployeeResponse,
   type DeleteEmployeeQuery,
   type Employee,
   type EmployeeListQuery,
@@ -56,14 +58,15 @@ export class EmployeesController {
     return this.employees.get(id);
   }
 
+  /** Also creates the employee's login, returning its one-time password once (ADR-0036). */
   @Post()
   @Roles('ADMIN')
   @ApiBody({ schema: openApi(CreateEmployeeSchema, 'input') })
-  @ApiOkResponse({ schema: openApi(EmployeeSchema) })
+  @ApiOkResponse({ schema: openApi(CreateEmployeeResponseSchema) })
   create(
     @Body(new ZodValidationPipe(CreateEmployeeSchema)) body: CreateEmployeeInput,
     @CurrentUser() user: RequestUser,
-  ): Promise<Employee> {
+  ): Promise<CreateEmployeeResponse> {
     return this.employees.create(body, user);
   }
 

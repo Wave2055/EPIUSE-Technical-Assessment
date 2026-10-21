@@ -14,8 +14,10 @@ export const AuthUserSchema = z.object({
   id: z.uuid(),
   email: z.email(),
   role: RoleSchema,
-  /** The employee record this login belongs to, if any (ADR-0022). */
+  /** The employee record this login belongs to (ADR-0022, ADR-0036). */
   employeeId: z.uuid().nullable(),
+  /** Signed in with a one-time password: must choose their own before anything else. */
+  mustChangePassword: z.boolean(),
 });
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 

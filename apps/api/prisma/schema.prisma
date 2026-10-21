@@ -53,16 +53,21 @@ model Employee {
   @@map("employees")
 }
 
-/// Logins are separate from employees (ADR-0014); each may link to one employee (ADR-0022).
+/// Every employee has exactly one login, created with them and deleted with them (ADR-0036).
 model User {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email         String         @unique @db.Citext
-  passwordHash  String         @map("password_hash")
-  role          Role
-  employeeId    String?        @unique @map("employee_id") @db.Uuid
-  employee      Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  refreshTokens RefreshToken[]
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email              String         @unique @db.Citext
+  /// NULL until a password is issued; sign-in is refused meanwhile.
+  passwordHash       String?        @map("password_hash")
+  role               Role
+  employeeId         String         @unique @map("employee_id") @db.Uuid
+  employee           Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// Set when an admin issues a one-time password; cleared when the user picks their own.
+  mustChangePassword Boolean        @default(false) @map("must_change_password")
+  deactivatedAt      DateTime?      @map("deactivated_at") @db.Timestamptz(6)
+  lastLoginAt        DateTime?      @map("last_login_at") @db.Timestamptz(6)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  refreshTokens      RefreshToken[]
 
   @@map("users")
 }
@@ -116,4 +121,20 @@ model Task {
   @@index([employeeId])
   @@index([assignedById])
   @@map("tasks")
+}
+
+/// Written only by the trigger on users (ADR-0036); never holds a password hash.
+model UserAudit {
+  id        BigInt   @id @default(autoincrement())
+  /// No foreign key: the row must outlive a deleted login.
+  userId    String   @map("user_id") @db.Uuid
+  email     String   @db.Citext
+  action    String
+  changedBy String?  @map("changed_by") @db.Uuid
+  changedAt DateTime @default(now()) @map("changed_at") @db.Timestamptz(6)
+  details   Json?
+
+  @@index([userId])
+  @@index([changedAt(sort: Desc)])
+  @@map("user_audit")
 }

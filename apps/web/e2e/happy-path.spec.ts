@@ -1,15 +1,12 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { admin, expect, test } from './fixtures';
 
 /**
- * ADR-0020 specifies exactly one E2E path, against a real API and database:
- * login → create → re-parent → search → delete → verify audit.
- *
- * Needs an API with the seeded admin login. Credentials come from the environment, since the
- * seed password is never committed: E2E_ADMIN_EMAIL (default admin@example.com) and
- * E2E_ADMIN_PASSWORD.
+ * The brief's core journey (ADR-0020): login → create → re-parent → search → delete →
+ * verify audit, against a real API and database.
  */
-const adminEmail = process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com';
-const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? '';
+const adminEmail = admin.email;
+const adminPassword = admin.password;
 
 // A fresh person per run, so the test can be repeated against the same database.
 const suffix = String(Date.now()).slice(-4);
@@ -27,8 +24,6 @@ async function pickManager(page: Page, name: RegExp) {
 }
 
 test.describe('employee lifecycle', () => {
-  test.skip(!adminPassword, 'Set E2E_ADMIN_PASSWORD to the seeded admin password.');
-
   test('login → create → re-parent → search → delete → verify audit', async ({ page }) => {
     // Login: a protected page sends us to sign in, then back.
     await page.goto('/employees');
@@ -55,6 +50,9 @@ test.describe('employee lifecycle', () => {
     await pickManager(page, /Thandi Nkosi/);
     await sheet.getByRole('button', { name: 'Add employee' }).click();
     await expect(page.getByText(`Added ${fullName}`)).toBeVisible();
+    // Their login was created too; the one-time password is shown once (ADR-0036).
+    await expect(page.getByRole('heading', { name: 'Login created' })).toBeVisible();
+    await page.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('row', { name: new RegExp(fullName) })).toContainText(
       'Thandi Nkosi',
     );

@@ -4,6 +4,9 @@ import {
   type AuditEntry,
   type AuditQuery,
   type Paginated,
+  type UserAuditEntry,
+  type UserAuditQuery,
+  UserAuditActionSchema,
 } from '@epiuse/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
@@ -77,6 +80,41 @@ export class AuditService {
           changes: diffSnapshots(before, after),
         };
       }),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
+
+  /** The account trail, written only by the trigger on users (ADR-0036). */
+  async listAccounts(query: UserAuditQuery): Promise<Paginated<UserAuditEntry>> {
+    const where = query.action ? { action: query.action } : {};
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.userAudit.findMany({
+        where,
+        orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.prisma.userAudit.count({ where }),
+    ]);
+    const actorIds = [...new Set(rows.map((r) => r.changedBy).filter((id) => id !== null))];
+    const actors = await this.prisma.user.findMany({
+      where: { id: { in: actorIds } },
+      select: { id: true, email: true },
+    });
+    const actorById = new Map(actors.map((a) => [a.id, a]));
+
+    return {
+      items: rows.map((row) => ({
+        id: Number(row.id),
+        userId: row.userId,
+        email: row.email,
+        action: UserAuditActionSchema.parse(row.action),
+        changedBy: row.changedBy ? (actorById.get(row.changedBy) ?? null) : null,
+        changedAt: row.changedAt.toISOString(),
+        details: (row.details as Record<string, string> | null) ?? null,
+      })),
       total,
       page: query.page,
       pageSize: query.pageSize,

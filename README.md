@@ -4,30 +4,51 @@ A cloud-hosted employee hierarchy manager, built for the EPI-USE technical asses
 
 **Live:** https://d1qxvq2ahpxf8h.cloudfront.net
 
-Sign-in details are shared separately. The two seeded accounts are `admin@example.com` (full access) and `viewer@example.com` (read-only, salaries hidden).
+Sign-in details are shared separately. The two seeded accounts with passwords are `admin@example.com` (full access) and `viewer@example.com` (read-only, salaries hidden). Every other employee has a login too; an admin issues its one-time password from the **Users** page ([ADR-0036](docs/adr/0036-every-employee-has-a-login-managed-by-admins.md)).
+
+![The org chart](docs/images/org-chart-details.png)
+
+## Documentation
+
+| Document                                               | For                   | What it covers                                                 |
+| ------------------------------------------------------ | --------------------- | -------------------------------------------------------------- |
+| [User guide](docs/user-guide.md)                       | People using the app  | Every screen and task, with screenshots                        |
+| [Technical document](docs/technical-document.md)       | Assessors, developers | Architecture, design patterns, technologies and why            |
+| [Requirements (SRS)](docs/srs.md)                      | Assessors, developers | Every requirement, its source, and how it is verified          |
+| [User stories](docs/user-stories.md)                   | Everyone              | The problem, the people, and how each need is met              |
+| [Diagrams](docs/diagrams.md)                           | Developers            | Context, deployment, request path, data model, flows, pipeline |
+| [Brand and style guide](docs/brand-and-style-guide.md) | Designers, developers | Colour, type, components, writing and formats                  |
+| [Decision records](docs/adr/README.md)                 | Developers            | Each decision, the alternatives, and what was given up         |
+| [Infrastructure runbook](infra/README.md)              | Operators             | Creating, deploying, backing up and tearing down on AWS        |
 
 ## What is in the repository
 
-| Path                                 | What it is                                                                                         |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| [`apps/api`](apps/api)               | NestJS API, Prisma migrations and seed, production Dockerfile                                      |
-| [`apps/web`](apps/web)               | React + Vite single-page app, unit tests and the Playwright end-to-end test                        |
-| [`packages/shared`](packages/shared) | Zod schemas shared by both: every request and response shape, defined once                         |
-| [`deploy`](deploy)                   | What the server runs: Compose file (PostgreSQL, API, Caddy), deploy and backup scripts             |
-| [`infra`](infra)                     | Terraform for AWS, with its own [runbook](infra/README.md)                                         |
-| [`docs/adr`](docs/adr)               | [Architecture decision records](docs/adr/README.md): why it is built this way, and what it gave up |
+| Path                                 | What it is                                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------------------- |
+| [`apps/api`](apps/api)               | NestJS API, Prisma migrations and seed, production Dockerfile                          |
+| [`apps/web`](apps/web)               | React + Vite single-page app, unit tests and the Playwright end-to-end suite           |
+| [`packages/shared`](packages/shared) | Zod schemas shared by both: every request and response shape, defined once             |
+| [`deploy`](deploy)                   | What the server runs: Compose file (PostgreSQL, API, Caddy), deploy and backup scripts |
+| [`infra`](infra)                     | Terraform for AWS, with its own [runbook](infra/README.md)                             |
+| [`e2e`](e2e)                         | The Docker stack the end-to-end tests run against, with a CloudFront stand-in          |
+| [`scripts`](scripts)                 | `e2e-docker.sh`: build, seed, test and tear down that stack                            |
+| [`docs`](docs)                       | The documents above, screenshots and the brief                                         |
 
 ## How it fits together
 
-```
-Browser ──HTTPS──► CloudFront ─┬─ /*         ► S3 (the web app)
-                               ├─ /avatars/* ► S3 (uploaded pictures)
-                               └─ /api/*     ► EC2 t3.micro, eu-west-1
-                                                 Caddy ► API ► PostgreSQL (own EBS volume,
-                                                                            nightly backup to S3)
+```mermaid
+flowchart LR
+  browser([Browser]) -- HTTPS --> cf[CloudFront]
+  cf -- "/*" --> web[(S3: web app)]
+  cf -- "/avatars/*" --> av[(S3: uploaded pictures)]
+  cf -- "/api/*" --> ec2
+  subgraph ec2[EC2 t3.micro, eu-west-1]
+    caddy[Caddy] --> api[API] --> pg[(PostgreSQL<br/>own EBS volume)]
+  end
+  pg -. nightly backup .-> bk[(S3)]
 ```
 
-One URL serves everything, so there is no CORS and the refresh cookie is same-site ([ADR-0016](docs/adr/0016-single-cloudfront-distribution-dual-origin.md)). The decision records explain each part; [ADR-0008](docs/adr/0008-defence-in-depth-cycle-prevention.md) (preventing reporting loops) and [ADR-0023](docs/adr/0023-postgresql-container-on-the-api-instance.md) (the cost-driven database choice) are good places to start.
+One URL serves everything, so there is no CORS and the refresh cookie is same-site ([ADR-0016](docs/adr/0016-single-cloudfront-distribution-dual-origin.md)). More views are in [diagrams.md](docs/diagrams.md). The decision records explain each part; [ADR-0008](docs/adr/0008-defence-in-depth-cycle-prevention.md) (preventing reporting loops) and [ADR-0023](docs/adr/0023-postgresql-container-on-the-api-instance.md) (the cost-driven database choice) are good places to start.
 
 ## Running it locally
 
@@ -52,12 +73,14 @@ The web dev server forwards `/api` to the local API, just as CloudFront does in 
 ```bash
 pnpm test:unit          # shared, API and web unit tests
 pnpm test:integration   # API against a throwaway PostgreSQL in Docker (Testcontainers)
-E2E_ADMIN_PASSWORD=<seeded admin password> pnpm test:e2e
-                        # sign in → create → re-parent → search → delete → audit, in a browser
-                        # (needs the API running and seeded)
+pnpm test:e2e:docker    # builds the whole app in Docker and runs every browser test against it
 ```
 
-CI runs secret scanning, formatting, lint, typecheck, unit and integration tests, both builds, and a boot test of the production API image on every push and pull request.
+`test:e2e:docker` needs only Docker and Playwright's Chromium (`pnpm --filter @epiuse/web exec playwright install chromium`). It builds the production API image and web build, runs them on PostgreSQL behind a stand-in for CloudFront, seeds the database, runs the Playwright suite, and removes everything afterwards ([ADR-0035](docs/adr/0035-end-to-end-tests-on-a-full-docker-build.md)). Pass Playwright options after it, e.g. `pnpm test:e2e:docker --grep viewer`.
+
+The user guide's screenshots come from the same stack: `CAPTURE_SCREENSHOTS=1 pnpm test:e2e:docker capture-screenshots` rewrites [`docs/images`](docs/images).
+
+CI runs secret scanning, formatting, lint, typecheck, unit and integration tests, both builds, a boot test of the production API image, and the Docker end-to-end suite on every push and pull request.
 
 ## Deploying
 

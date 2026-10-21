@@ -1,7 +1,12 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { AccessTokenResponse, AuthUser, LoginInput } from '@epiuse/shared';
+import type {
+  AccessTokenResponse,
+  AuthUser,
+  ChangePasswordInput,
+  LoginInput,
+} from '@epiuse/shared';
 import { ApiError } from '../common/errors/api-error.js';
 import { AppConfig } from '../config/app-config.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -38,11 +43,49 @@ export class AuthService {
     private readonly tokens: RefreshTokenStore,
   ) {}
 
+  /**
+   * A login with no password yet, or a deactivated one, gets the same answer as a wrong
+   * password, after the same hash comparison, so neither state can be probed (ADR-0036).
+   */
   async login({ email, password }: LoginInput): Promise<IssuedSession> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     const valid = await verifyPassword(user?.passwordHash ?? (await this.dummyHash), password);
-    if (!user || !valid) throw invalidCredentials();
+    if (!user || !user.passwordHash || !valid || user.deactivatedAt !== null) {
+      throw invalidCredentials();
+    }
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return this.issue(user, randomUUID());
+  }
+
+  /**
+   * Replaces the caller's password, clearing a one-time password's flag. Every existing
+   * session ends, so a leaked token or cookie stops working; the caller gets a new one.
+   */
+  async changePassword(
+    userId: string,
+    { currentPassword, newPassword }: ChangePasswordInput,
+  ): Promise<IssuedSession> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deactivatedAt !== null) throw sessionExpired();
+    const valid = await verifyPassword(
+      user.passwordHash ?? (await this.dummyHash),
+      currentPassword,
+    );
+    if (!user.passwordHash || !valid) {
+      throw new ApiError(400, 'VALIDATION_FAILED', 'Your current password is not right.', {
+        issues: [{ path: 'currentPassword', message: 'Your current password is not right.' }],
+      });
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    const updated = await this.prisma.auditedTransaction(user.id, (tx) =>
+      tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash, mustChangePassword: false },
+      }),
+    );
+    await this.tokens.revokeAllForUser(user.id);
+    return this.issue(updated, randomUUID());
   }
 
   async refresh(refreshToken: string | undefined): Promise<IssuedSession> {
@@ -63,7 +106,7 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: stored.userId } });
-    if (!user) throw sessionExpired();
+    if (!user || user.deactivatedAt !== null) throw sessionExpired();
     return this.issue(user, stored.familyId);
   }
 
@@ -74,7 +117,13 @@ export class AuthService {
   }
 
   private async issue(
-    user: { id: string; email: string; role: AuthUser['role']; employeeId: string | null },
+    user: {
+      id: string;
+      email: string;
+      role: AuthUser['role'];
+      employeeId: string | null;
+      mustChangePassword: boolean;
+    },
     familyId: string,
   ): Promise<IssuedSession> {
     const { JWT_ACCESS_SECRET, JWT_ACCESS_TTL_SECONDS, REFRESH_TOKEN_TTL_DAYS } = this.config.env;
@@ -95,7 +144,13 @@ export class AuthService {
     return {
       accessToken,
       expiresIn: JWT_ACCESS_TTL_SECONDS,
-      user: { id: user.id, email: user.email, role: user.role, employeeId: user.employeeId },
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        employeeId: user.employeeId,
+        mustChangePassword: user.mustChangePassword,
+      },
       refreshToken,
       refreshExpiresAt,
     };
