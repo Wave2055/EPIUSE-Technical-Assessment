@@ -1,9 +1,13 @@
-import type {
-  CreateEmployeeInput,
-  CreateEmployeeResponse,
-  Employee,
-  Paginated,
-  TemporaryPassword,
+import {
+  AVATAR_CONTENT_TYPES,
+  AVATAR_MAX_BYTES,
+  type AvatarUploadRequest,
+  type AvatarUploadResponse,
+  type CreateEmployeeInput,
+  type CreateEmployeeResponse,
+  type Employee,
+  type Paginated,
+  type TemporaryPassword,
 } from '@epiuse/shared';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api-client';
@@ -100,6 +104,71 @@ export function useDeleteEmployee() {
       if (strategy === 'reassign' && reassignTo) query.set('reassignTo', reassignTo);
       return apiFetch<void>(`/employees/${id}?${query}`, { method: 'DELETE' });
     },
+    onSuccess: () => invalidateAfterChange(queryClient),
+  });
+}
+
+/** An upload problem worded for the user, as API errors already are. */
+export class AvatarUploadError extends Error {
+  override name = 'AvatarUploadError';
+}
+
+/** A picture the browser can tell is unusable before anything is sent; `null` when fine. */
+export function avatarFileProblem(file: File): string | null {
+  if (!(AVATAR_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+    return 'Choose a PNG, JPEG or WebP image.';
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return `Choose an image under ${AVATAR_MAX_BYTES / 1024 / 1024} MB.`;
+  }
+  return null;
+}
+
+/**
+ * The three-step upload (ADR-0013): the API signs a POST, the browser sends the file
+ * straight to S3, then the API checks it landed and points the employee at it. S3 enforces
+ * the type and size again, so the checks above are for a friendlier message only.
+ */
+export async function uploadAvatar(id: string, file: File): Promise<Employee> {
+  const problem = avatarFileProblem(file);
+  if (problem) throw new AvatarUploadError(problem);
+
+  const request: AvatarUploadRequest = {
+    contentType: file.type as AvatarUploadRequest['contentType'],
+  };
+  const upload = await apiFetch<AvatarUploadResponse>(`/employees/${id}/avatar/upload-url`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+
+  // S3 reads the policy fields first and the file last.
+  const form = new FormData();
+  for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
+  form.append('file', file);
+  const response = await fetch(upload.url, { method: 'POST', body: form });
+  if (!response.ok) {
+    throw new AvatarUploadError('The picture could not be uploaded. Please try again.');
+  }
+
+  return apiFetch<Employee>(`/employees/${id}/avatar`, {
+    method: 'PATCH',
+    body: JSON.stringify({ key: upload.key }),
+  });
+}
+
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => uploadAvatar(id, file),
+    onSuccess: () => invalidateAfterChange(queryClient),
+  });
+}
+
+/** Back to Gravatar, or initials when there is none. */
+export function useRemoveAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<Employee>(`/employees/${id}/avatar`, { method: 'DELETE' }),
     onSuccess: () => invalidateAfterChange(queryClient),
   });
 }

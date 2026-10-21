@@ -176,7 +176,7 @@ Built in addition to the requirements, as the brief invites:
 - **Audit trail** of every change, with who made it and each field's old and new value ([ADR-0011](adr/0011-audit-trail-via-database-triggers.md)).
 - **Home page with tasks**, where managers can assign tasks to their direct reports ([ADR-0022](adr/0022-home-screen-tasks-and-user-employee-link.md), [ADR-0032](adr/0032-managers-assign-tasks-to-direct-reports.md)).
 - **Explicit deletion strategies** that never orphan a team ([ADR-0010](adr/0010-explicit-deletion-strategies.md)).
-- **Avatar upload API** (the optional nice-to-have), served through CloudFront; the web app does not yet have an upload screen ([ADR-0013](adr/0013-avatar-resolution-chain.md)).
+- **Picture upload** (the optional nice-to-have): admins upload from the edit form straight to S3 with a presigned POST, and pictures are served through CloudFront ([ADR-0013](adr/0013-avatar-resolution-chain.md)).
 - **Rate limiting**, a strict CSP and other hardening ([ADR-0025](adr/0025-rate-limit-by-client-address.md), [ADR-0034](adr/0034-harden-the-public-web-surface.md)).
 - **Continuous deployment** from `main`, with no stored cloud keys ([ADR-0019](adr/0019-github-actions-oidc-cicd.md)).
 

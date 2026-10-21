@@ -241,7 +241,15 @@ Pictures come from [Gravatar](https://gravatar.com), a free service that links a
 
 Anyone without a Gravatar picture is shown with their initials on a colour.
 
-The API also supports uploading a picture for an employee, which then takes priority over Gravatar. There is no upload screen in the web app yet.
+### Uploading a picture _(admins)_
+
+For someone without a Gravatar, or to use a different photo, an admin can upload one:
+
+1. Open **Edit** on the person (from the table or the org chart's details panel).
+2. At the top of the form, choose **Upload picture** and pick a PNG, JPEG or WebP image of up to 2 MB.
+3. The picture is saved straight away, without choosing **Save changes**, and replaces their Gravatar everywhere.
+
+**Remove picture** in the same place goes back to their Gravatar, or their initials if they have none. A picture can only be added once the employee exists, so add them first, then edit them.
 
 ## 11. Messages you might see
 

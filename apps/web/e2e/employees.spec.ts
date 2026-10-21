@@ -90,6 +90,47 @@ test.describe('the employee form', () => {
   });
 });
 
+test.describe('employee pictures', () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page, admin, '/employees');
+  });
+
+  test('are offered when editing, not when adding', async ({ page }) => {
+    await page.getByRole('button', { name: 'Add employee' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload picture' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: `Actions for ${admin.name}` }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await expect(page.getByRole('button', { name: 'Upload picture' })).toBeVisible();
+  });
+
+  test('refuses a file that is not a picture before sending it', async ({ page }) => {
+    await page.getByRole('button', { name: `Actions for ${admin.name}` }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByLabel('Picture file').setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('not an image'),
+    });
+    await expect(page.getByText('Choose a PNG, JPEG or WebP image.')).toBeVisible();
+  });
+
+  // The Docker stack has no avatar bucket, so the API answers that uploads are off. This
+  // proves the sheet reaches the API and reports its reason; S3 itself is covered on AWS.
+  test("passes on the server's reason when uploads are not set up", async ({ page }) => {
+    await page.getByRole('button', { name: `Actions for ${admin.name}` }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByLabel('Picture file').setInputFiles({
+      name: 'me.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('89504e470d0a1a0a', 'hex'),
+    });
+    await expect(page.getByText(/Picture uploads are not set up on this server/)).toBeVisible();
+  });
+});
+
 test.describe('deleting a manager', () => {
   test('moves the team up a level by default', async ({ page, request }) => {
     const api = await apiAs(request, admin);
