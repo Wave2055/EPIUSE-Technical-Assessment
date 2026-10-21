@@ -58,10 +58,9 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 **US-09 — Sort and filter a list of employees.** As any user, I want a table of all employees that I can sort and filter, so that I can answer questions like "who are all the developers under Thandi?".
 
-- Every column sorts: name, employee number, role, manager, birth date and salary.
-- A search box matches name, employee number, email and role, and dropdowns filter by role and by manager.
+- Every column sorts: first name, surname, employee number, role, manager, birth date and salary.
+- A search box matches name, employee number, email and role. Dropdowns filter by role and by manager, **Details** filters first name, surname, employee number and email one at a time, and birth date and salary filter by a range.
 - Sorting and filtering happen in the browser, so they respond instantly ([ADR-0005](adr/0005-react-vite-spa-for-the-web-client.md)).
-- **Gap:** birth date and salary can be sorted but have no filter control of their own yet.
 
 ### Avatars
 
@@ -71,7 +70,7 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 **US-11 — Upload a photo.** _(Optional in the brief.)_ As an HR administrator, I want to upload a photo for an employee who has no Gravatar, so that everyone has a recognisable picture.
 
-- **Partly built: the API supports it, the web app has no upload screen yet.** The API issues a presigned upload for a PNG, JPEG or WebP of up to 2 MB, sent straight to S3. An uploaded photo takes priority over Gravatar, and removing it falls back to Gravatar, then initials.
+- **Upload picture** on the edit form takes a PNG, JPEG or WebP of up to 2 MB. The API issues a presigned upload and the browser sends the file straight to S3. An uploaded photo takes priority over Gravatar, and **Remove picture** falls back to Gravatar, then initials.
 
 ### Access, privacy and accountability _(beyond the brief)_
 
@@ -132,18 +131,18 @@ EPI-USE Africa needs one place, reachable at a URL, to keep its employee records
 
 ## Coverage of the brief
 
-| Brief requirement                                                        | Stories                                                  |
-| ------------------------------------------------------------------------ | -------------------------------------------------------- |
-| Create, read, update and delete employees                                | US-01, US-02, US-03                                      |
-| Set a reporting line manager                                             | US-04                                                    |
-| No one may be their own manager                                          | US-05                                                    |
-| Employees with no manager (e.g. the CEO)                                 | US-06                                                    |
-| Minimum fields: name, surname, birth date, number, salary, role, manager | US-01                                                    |
-| Visual hierarchy (tree or graph)                                         | US-07                                                    |
-| Search the hierarchy to find, edit or delete                             | US-08                                                    |
-| Table sortable and filterable on any field                               | US-09 (birth date and salary sort but do not yet filter) |
-| Gravatar integration                                                     | US-10                                                    |
-| Avatar upload _(optional)_                                               | US-11 (API only)                                         |
-| Deployed to the cloud at a URL                                           | US-17                                                    |
-| No mocked data; changes stored in a remote database                      | US-17                                                    |
-| Additional features                                                      | US-12 to US-16, US-18 to US-23                           |
+| Brief requirement                                                        | Stories                        |
+| ------------------------------------------------------------------------ | ------------------------------ |
+| Create, read, update and delete employees                                | US-01, US-02, US-03            |
+| Set a reporting line manager                                             | US-04                          |
+| No one may be their own manager                                          | US-05                          |
+| Employees with no manager (e.g. the CEO)                                 | US-06                          |
+| Minimum fields: name, surname, birth date, number, salary, role, manager | US-01                          |
+| Visual hierarchy (tree or graph)                                         | US-07                          |
+| Search the hierarchy to find, edit or delete                             | US-08                          |
+| Table sortable and filterable on any field                               | US-09                          |
+| Gravatar integration                                                     | US-10                          |
+| Avatar upload _(optional)_                                               | US-11                          |
+| Deployed to the cloud at a URL                                           | US-17                          |
+| No mocked data; changes stored in a remote database                      | US-17                          |
+| Additional features                                                      | US-12 to US-16, US-18 to US-23 |

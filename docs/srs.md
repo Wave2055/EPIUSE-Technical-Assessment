@@ -102,22 +102,22 @@ Priority: **M** must (the brief), **S** should (extension). Verification: **U** 
 
 ### 3.3 Viewing and finding
 
-| ID    | Requirement                                                                                                                                   | Pri | Source | Verified |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
-| FR-20 | The organisation is shown as an interactive tree that can be panned and zoomed, with each person's picture, name, role and number of reports. | M   | B      | U, E     |
-| FR-21 | Users can search the hierarchy by name, role or employee number and open the person found.                                                    | M   | B      | E        |
-| FR-22 | From a search result, admins can edit or delete the person.                                                                                   | M   | B      | E        |
-| FR-23 | A table lists every employee, sortable on every field.                                                                                        | M   | B      | U, E     |
-| FR-24 | The table filters on every field: free text across name, number, email and role; role; manager; birth-date range; salary range.               | M   | B      | U, E     |
-| FR-25 | Search text is matched literally; `%`, `_` and quotes have no special meaning.                                                                | S   | X      | U, I     |
+| ID    | Requirement                                                                                                                                                                                                   | Pri | Source | Verified |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ------ | -------- |
+| FR-20 | The organisation is shown as an interactive tree that can be panned and zoomed, with each person's picture, name, role and number of reports.                                                                 | M   | B      | U, E     |
+| FR-21 | Users can search the hierarchy by name, role or employee number and open the person found.                                                                                                                    | M   | B      | E        |
+| FR-22 | From a search result, admins can edit or delete the person.                                                                                                                                                   | M   | B      | E        |
+| FR-23 | A table lists every employee, sortable on every field, with first name and surname sortable separately.                                                                                                       | M   | B      | U, E     |
+| FR-24 | The table filters on every field: free text across name, number, email and role, every word matching; first name, surname, number and email each on their own; role; manager; birth-date range; salary range. | M   | B      | U, E     |
+| FR-25 | Search text is matched literally; `%`, `_` and quotes have no special meaning.                                                                                                                                | S   | X      | U, I     |
 
 ### 3.4 Pictures
 
-| ID    | Requirement                                                                                                                                                                    | Pri | Source                                             | Verified |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --- | -------------------------------------------------- | -------- |
-| FR-30 | Each employee's Gravatar picture is shown, looked up by the SHA-256 of their trimmed, lower-cased email.                                                                       | M   | B, [ADR-0013](adr/0013-avatar-resolution-chain.md) | U, E     |
-| FR-31 | Without a Gravatar, the employee's initials are shown.                                                                                                                         | S   | X                                                  | R        |
-| FR-32 | An admin can upload a PNG, JPEG or WebP picture up to 2 MB for an employee through the API, which then takes priority over Gravatar. _(The web app has no upload screen yet.)_ | S   | B (optional)                                       | I        |
+| ID    | Requirement                                                                                                                                                      | Pri | Source                                             | Verified |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------------------------------- | -------- |
+| FR-30 | Each employee's Gravatar picture is shown, looked up by the SHA-256 of their trimmed, lower-cased email.                                                         | M   | B, [ADR-0013](adr/0013-avatar-resolution-chain.md) | U, E     |
+| FR-31 | Without a Gravatar, the employee's initials are shown.                                                                                                           | S   | X                                                  | R        |
+| FR-32 | An admin can upload a PNG, JPEG or WebP picture up to 2 MB for an employee from the edit form, which then takes priority over Gravatar, and can remove it again. | S   | B (optional)                                       | U, I, E  |
 
 ### 3.5 Access and accountability
 
@@ -249,7 +249,6 @@ JSON over HTTPS under `/api`, on the same origin as the web app. Errors are alwa
 
 ## 7. Known gaps
 
-- **FR-32:** picture upload exists in the API only; there is no upload screen.
 - **No self-service password reset:** a forgotten password needs an admin, and one-time passwords are handed over by the admin; there is no email delivery ([ADR-0036](adr/0036-every-employee-has-a-login-managed-by-admins.md)).
 - **No password reset, MFA or per-account lockout** ([ADR-0014](adr/0014-self-hosted-jwt-auth-and-salary-masking.md)).
 - **Tasks are not audited**, and there is no edit or delete control for tasks in the web app; only the done tick.

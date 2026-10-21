@@ -35,6 +35,7 @@ import {
 import { ApiRequestError } from '@/lib/api-client';
 import { errorMessage } from '@/lib/errors';
 import { useEmployees, useSaveEmployee } from './api';
+import { AvatarPicker } from './avatar-picker';
 import { formatDate, fullName, parseIsoDate, toIsoDate } from './format';
 import { getEligibleManagers } from './hierarchy';
 import type { Employee } from './types';
@@ -172,6 +173,8 @@ export function EmployeeFormSheet({
             noValidate
           >
             <div className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:grid-cols-2">
+              {/* A new employee has no id to attach a picture to until it is saved. */}
+              {employee && <AvatarPicker employee={employee} />}
               <FormField
                 control={form.control}
                 name="firstName"

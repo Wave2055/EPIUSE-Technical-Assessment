@@ -126,8 +126,9 @@ Choose **Find an employee** (or press **Ctrl K**, **⌘ K** on a Mac) and type p
 
 - **Search** matches name, employee number, email and role. Several words must all match, so "aisha manager" finds Aisha Patel, Engineering Manager.
 - **All roles** and **All managers** narrow the list to one role or one manager's direct reports.
+- **Details** filters one field at a time: first name, surname, employee number or email, each matching any part of it. The button shows how many are in use.
 - **Birth date** and **Salary** _(admins)_ filter by a range. Fill in either end, or both; an empty end means "no limit". Both ends are included.
-- **Sort** by any column: select its heading. Select again to reverse it. Salary sorts highest first on the first select; the other columns start A to Z or earliest first.
+- **Sort** by any column: select its heading. Select again to reverse it. The name column has two headings, **First name** and **Surname**, so either can lead. Salary sorts highest first on the first select; the other columns start A to Z or earliest first.
 - **Clear** removes every filter at once.
 
 ![Filtering by salary](images/employees-salary-filter.png)
@@ -241,7 +242,15 @@ Pictures come from [Gravatar](https://gravatar.com), a free service that links a
 
 Anyone without a Gravatar picture is shown with their initials on a colour.
 
-The API also supports uploading a picture for an employee, which then takes priority over Gravatar. There is no upload screen in the web app yet.
+### Uploading a picture _(admins)_
+
+For someone without a Gravatar, or to use a different photo, an admin can upload one:
+
+1. Open **Edit** on the person (from the table or the org chart's details panel).
+2. At the top of the form, choose **Upload picture** and pick a PNG, JPEG or WebP image of up to 2 MB.
+3. The picture is saved straight away, without choosing **Save changes**, and replaces their Gravatar everywhere.
+
+**Remove picture** in the same place goes back to their Gravatar, or their initials if they have none. A picture can only be added once the employee exists, so add them first, then edit them.
 
 ## 11. Messages you might see
 

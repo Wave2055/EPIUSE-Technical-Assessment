@@ -40,6 +40,29 @@ test.describe('the employee table', () => {
     await expect(page.getByRole('row', { name: /Thandi Nkosi/ })).toHaveCount(0);
   });
 
+  test('filters by surname and email, and sorts by surname', async ({ page }) => {
+    await page.getByRole('button', { name: 'Filter by name, number or email' }).click();
+    await page.getByLabel('Surname contains').fill('khumalo');
+    await expect(page.getByRole('row', { name: /Zanele Khumalo/ })).toBeVisible();
+    await expect(page.getByText(/^1 of \d+ employees$/)).toBeVisible();
+    await page.getByLabel('Surname contains').fill('');
+    await page.getByLabel('Email contains').fill('pieter.vanwyk@');
+    await expect(page.getByRole('row', { name: new RegExp(admin.name) })).toBeVisible();
+    await expect(page.getByText(/^1 of \d+ employees$/)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: /Clear/ }).click();
+
+    await page.getByRole('button', { name: 'Surname', exact: true }).click();
+    // Seeded first names are one word, so the rest of the name is the surname ("van Wyk").
+    const surnames = await page
+      .locator('tbody tr span.text-heading')
+      .evaluateAll((names) => names.map((n) => n.textContent!.split(' ').slice(1).join(' ')));
+    expect(surnames.length).toBeGreaterThan(10);
+    expect(surnames).toEqual(
+      [...surnames].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })),
+    );
+  });
+
   test('shows a message when nothing matches', async ({ page }) => {
     await page.getByLabel('Search employees').fill('zzzz-no-match');
     await expect(page.getByText('No employees match these filters.')).toBeVisible();
@@ -87,6 +110,47 @@ test.describe('the employee form', () => {
     for (const below of ['Pieter van Wyk', 'Aisha Patel', 'Ruan Pretorius', 'Johan Botha']) {
       await expect(options.filter({ hasText: below })).toHaveCount(0);
     }
+  });
+});
+
+test.describe('employee pictures', () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page, admin, '/employees');
+  });
+
+  test('are offered when editing, not when adding', async ({ page }) => {
+    await page.getByRole('button', { name: 'Add employee' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload picture' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: `Actions for ${admin.name}` }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await expect(page.getByRole('button', { name: 'Upload picture' })).toBeVisible();
+  });
+
+  test('refuses a file that is not a picture before sending it', async ({ page }) => {
+    await page.getByRole('button', { name: `Actions for ${admin.name}` }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByLabel('Picture file').setInputFiles({
+      name: 'notes.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('not an image'),
+    });
+    await expect(page.getByText('Choose a PNG, JPEG or WebP image.')).toBeVisible();
+  });
+
+  // The Docker stack has no avatar bucket, so the API answers that uploads are off. This
+  // proves the sheet reaches the API and reports its reason; S3 itself is covered on AWS.
+  test("passes on the server's reason when uploads are not set up", async ({ page }) => {
+    await page.getByRole('button', { name: `Actions for ${admin.name}` }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByLabel('Picture file').setInputFiles({
+      name: 'me.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('89504e470d0a1a0a', 'hex'),
+    });
+    await expect(page.getByText(/Picture uploads are not set up on this server/)).toBeVisible();
   });
 });
 
